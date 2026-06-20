@@ -114,110 +114,7 @@ const inputSt = {
 // ═══════════════════════════════════════════
 // APP
 // ═══════════════════════════════════════════
-// ── Login Screen ──
-function LoginScreen({ onLogin }) {
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleLogin(e) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
-    if (error) {
-      setError("이메일 또는 비밀번호가 틀렸어요");
-    } else {
-      onLogin();
-    }
-    setLoading(false);
-  }
-
-  return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "#f8fafc", fontFamily: "'Pretendard', system-ui, -apple-system, sans-serif",
-      padding: 20,
-    }}>
-      <div style={{ width: "100%", maxWidth: 360 }}>
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>💜</div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: 0 }}>아름 💜 진수네</h1>
-          <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>로그인해서 가계부를 확인하세요</p>
-        </div>
-        <div style={{ background: "#fff", borderRadius: 16, padding: "24px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 5 }}>이메일</div>
-              <input
-                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@example.com"
-                style={inputSt}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 5 }}>비밀번호</div>
-              <input
-                type="password" value={pw} onChange={(e) => setPw(e.target.value)}
-                placeholder="비밀번호"
-                onKeyDown={(e) => { if (e.key === "Enter") handleLogin(e); }}
-                style={inputSt}
-              />
-            </div>
-            {error && <div style={{ fontSize: 12, color: "#ef4444", textAlign: "center" }}>{error}</div>}
-            <button
-              onClick={handleLogin}
-              disabled={loading}
-              style={{
-                marginTop: 4, padding: "13px 0", borderRadius: 11, border: "none",
-                background: loading ? "#94a3b8" : "#0f172a", color: "#fff",
-                fontSize: 14, fontWeight: 700, cursor: loading ? "default" : "pointer",
-              }}
-            >
-              {loading ? "로그인 중..." : "로그인"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════
-// APP
-// ═══════════════════════════════════════════
 export default function App() {
-  const [session, setSession] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setAuthReady(true);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (!authReady) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", fontFamily: "system-ui", color: "#94a3b8" }}>
-        불러오는 중...
-      </div>
-    );
-  }
-
-  if (!session) {
-    return <LoginScreen onLogin={() => {}} />;
-  }
-
-  return <MainApp session={session} />;
-}
-
-function MainApp({ session }) {
   const [data, setData] = useState([]);
   const [assets, setAssets] = useState([]);
   const [ready, setReady] = useState(false);
@@ -539,17 +436,9 @@ function MainApp({ session }) {
         background: "#fff", borderBottom: "1px solid #e2e8f0",
         padding: "14px 20px 10px", position: "sticky", top: 0, zIndex: 10,
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.03em" }}>
-            아름 💜 진수네
-          </h1>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            style={{ background: "none", border: "none", fontSize: 11, color: "#94a3b8", cursor: "pointer" }}
-          >
-            로그아웃
-          </button>
-        </div>
+        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.03em" }}>
+          아름 💜 진수네
+        </h1>
         {!formOpen && (() => {
           // Group months by year
           const byYear = {};
