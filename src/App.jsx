@@ -140,6 +140,7 @@ export default function App() {
 
   // Asset editing
   const [editingAsset, setEditingAsset] = useState(null); // asset name being amount-edited
+  const [showPrev, setShowPrev] = useState(false);
   const [assetDraft, setAssetDraft] = useState("");
   const [addingAsset, setAddingAsset] = useState(false);
   const [newAssetName, setNewAssetName] = useState("");
@@ -1093,6 +1094,7 @@ export default function App() {
                             + 메모 추가
                           </div>
                         )}
+                        {showPrev && a.prevAmt > 0 && (<div style={{display:"flex",justifyContent:"space-between",marginTop:4,marginLeft:12}}><span style={{fontSize:10,color:"#94a3b8"}}>{prevMonth}</span><span style={{fontSize:10,color:"#94a3b8"}}>{wonShort(a.prevAmt)}{a.amount>0?(a.amount>=a.prevAmt?" ▲":" ▼"):""}</span></div>)}
                         {/* Edit mode */}
                         {isEditing && (
                           <div style={{ marginTop: 6, marginLeft: 12 }}>
