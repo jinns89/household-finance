@@ -332,15 +332,9 @@ export default function App() {
 
   // Get item template: all unique asset names from the most recent month that has data
   const assetTemplate = useMemo(() => {
-    // Find the most recent month before or equal to selected month that has data
-    const monthsWithData = [...new Set(assets.map((a) => a.month))]
-      .sort((a, b) => parseMonthKey(b) - parseMonthKey(a));
-    const refMonth = monthsWithData.find((m) => parseMonthKey(m) <= parseMonthKey(month))
-      || monthsWithData[0];
-    if (!refMonth) return [];
-    const items = assets.filter((a) => a.month === refMonth);
-    return items.map((a) => a.name);
-  }, [assets, month]);
+    const allNames = [...new Set(assets.map((a) => a.name))];
+    return allNames;
+  }, [assets]);
 
   // For current month: get existing values, or 0 for template items
   const currentSavings = useMemo(() => {
