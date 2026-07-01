@@ -957,11 +957,11 @@ export default function App() {
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#3b82f6" }}>예적금</span>
                       {prevAst && totSavings > 0 && (() => {
                         const b = pctBadge(totSavings, prevAst.savings);
-                        return b ? <span style={{ fontSize: 10, fontWeight: 700, color: b.color }}>{b.text}</span> : null;
+                        return b ? <span style={{ fontSize: 10, fontWeight: 700, color: b.color }}>{"전월" + b.text}</span> : null;
                       })()}
                       {janAst && totSavings > 0 && month !== (month.match(/^(\d+)\./)?.[1] + ".1월") && (() => {
                         const b = pctBadge(totSavings, janAst.savings);
-                        return b ? <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1" }}>연간{b.text}</span> : null;
+                        return b ? <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1" }}>연간{"전월" + b.text}</span> : null;
                       })()}
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{totSavings > 0 ? wonShort(totSavings) : "-"}</span>
@@ -1009,11 +1009,11 @@ export default function App() {
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#8b5cf6" }}>투자</span>
                       {prevAst && totInvest > 0 && (() => {
                         const b = pctBadge(totInvest, prevAst.invest);
-                        return b ? <span style={{ fontSize: 10, fontWeight: 700, color: b.color }}>{b.text}</span> : null;
+                        return b ? <span style={{ fontSize: 10, fontWeight: 700, color: b.color }}>{"전월" + b.text}</span> : null;
                       })()}
                       {janAst && totInvest > 0 && month !== (month.match(/^(\d+)\./)?.[1] + ".1월") && (() => {
                         const b = pctBadge(totInvest, janAst.invest);
-                        return b ? <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1" }}>연간{b.text}</span> : null;
+                        return b ? <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1" }}>연간{"전월" + b.text}</span> : null;
                       })()}
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{totInvest > 0 ? wonShort(totInvest) : "-"}</span>
