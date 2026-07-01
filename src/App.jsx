@@ -978,7 +978,7 @@ export default function App() {
                               value={assetDraft ? parseInt(assetDraft.replace(/[^0-9]/g, "") || "0").toLocaleString() : ""}
                               onChange={(e) => setAssetDraft(e.target.value.replace(/[^0-9]/g, ""))}
                               onKeyDown={(e) => {
-                                if (e.key === "Enter") {
+                                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault();
                                   const v = parseInt((assetDraft || "0").replace(/[^0-9]/g, ""));
                                   if (v > 0) updateAssetAmount(a.name, month, v);
                                   setEditingAsset(null);
@@ -1047,7 +1047,7 @@ export default function App() {
                                 value={assetDraft ? parseInt(assetDraft.replace(/[^0-9]/g, "") || "0").toLocaleString() : ""}
                                 onChange={(e) => setAssetDraft(e.target.value.replace(/[^0-9]/g, ""))}
                                 onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
+                                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault();
                                     const v = parseInt((assetDraft || "0").replace(/[^0-9]/g, ""));
                                     if (v > 0) updateAssetAmount(a.name, month, v);
                                     setEditingAsset(null);
@@ -1099,7 +1099,7 @@ export default function App() {
                               autoFocus
                               value={itemDraft}
                               onChange={(e) => setItemDraft(e.target.value)}
-                              placeholder="손익률, 평가금액, 메모 등"
+                              placeholder="손익률, 평가금액, 메모 등(Shift+Enter로 줄바꿈)"
                               style={{
                                 width: "100%", padding: "7px 10px", borderRadius: 6,
                                 border: "1.5px solid #c4b5fd", fontSize: 12,
@@ -1107,7 +1107,7 @@ export default function App() {
                                 outline: "none", boxSizing: "border-box",
                               }}
                               onKeyDown={(e) => {
-                                if (e.key === "Enter") {
+                                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault();
                                   saveItemMemo(month, a.name, itemDraft);
                                   setEditingItem(null);
                                 }
