@@ -1096,17 +1096,16 @@ export default function App() {
                         {/* Edit mode */}
                         {isEditing && (
                           <div style={{ marginTop: 6, marginLeft: 12 }}>
-                            <input
-                              type="text"
+                            <textarea
                               autoFocus
                               value={itemDraft}
                               onChange={(e) => setItemDraft(e.target.value)}
-                              placeholder="손익률, 평가금액, 메모 등(Shift+Enter로 줄바꿈)"
+                              placeholder="손익률, 평가금액, 메모 등" rows={3}
                               style={{
                                 width: "100%", padding: "7px 10px", borderRadius: 6,
                                 border: "1.5px solid #c4b5fd", fontSize: 12,
                                 color: "#0f172a", background: "#faf8ff",
-                                outline: "none", boxSizing: "border-box",
+                                outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit",
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault();
@@ -1114,7 +1113,7 @@ export default function App() {
                                   setEditingItem(null);
                                 }
                               }}
-                            />
+                            ></textarea>
                             <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                               <button
                                 onClick={() => { saveItemMemo(month, a.name, itemDraft); setEditingItem(null); }}
