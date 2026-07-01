@@ -1075,7 +1075,7 @@ export default function App() {
                             onClick={() => { setEditingItem(a.name); setItemDraft(memo); }}
                             style={{
                               marginTop: 4, marginLeft: 12, padding: "5px 10px",
-                              borderRadius: 6, background: "#f5f3ff", cursor: "pointer",
+                              borderRadius: 6, background: "#f5f3ff", cursor: "pointer", whiteSpace: "pre-wrap",
                               fontSize: 12, lineHeight: 1.5, color: "#6d28d9",
                             }}
                           >
