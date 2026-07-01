@@ -992,8 +992,7 @@ export default function App() {
                           <div onClick={() => { setEditingAsset("s-" + a.name); setAssetDraft(a.amount > 0 ? String(a.amount) : ""); }} style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}>
                             <span style={{ fontSize: 12, fontWeight: 500, color: "#475569" }}>{a.name}</span>
                             <span style={{ fontSize: 12, fontWeight: 700, color: a.amount > 0 ? "#0f172a" : "#cbd5e1" }}>
-                              {a.amount > 0 ? wonShort(a.amount) : "미입력"}
-                            </span>
+                              </div>
                           </div>
                         )}
                       </div>
@@ -1058,11 +1057,14 @@ export default function App() {
                               <button onClick={() => { const v = parseInt((assetDraft || "0").replace(/[^0-9]/g, "")); if (v > 0) updateAssetAmount(a.name, month, v); setEditingAsset(null); }} style={{ padding: "3px 7px", borderRadius: 5, border: "none", background: "#7c3aed", color: "#fff", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>확인</button>
                             </div>
                           ) : (
-                            <span
+                            <div
                               onClick={() => { setEditingAsset("i-" + a.name); setAssetDraft(a.amount > 0 ? String(a.amount) : ""); }}
-                              style={{ fontSize: 12, fontWeight: 700, color: a.amount > 0 ? "#0f172a" : "#cbd5e1", cursor: "pointer" }}
+                              style={{ cursor: "pointer", textAlign: "right" }}
                             >
-                              {a.amount > 0 ? wonShort(a.amount) : "미입력"}
+                              <div style={{ fontSize: 12, fontWeight: 700, color: a.amount > 0 ? "#0f172a" : "#cbd5e1" }}>
+                                {a.amount > 0 ? wonShort(a.amount) : "미입력"}</div>
+                              {a.amount > 0 && a.prevAmt > 0 && (() => { const p = ((a.amount - a.prevAmt) / a.prevAmt * 100); return <span style={{fontSize:9,fontWeight:600,color:p>=0?"#059669":"#dc2626",marginRight:4}}>{p>=0?"+":""}{p.toFixed(1)}%</span>; })()}
+                              {a.amount > 0 && a.janAmt > 0 && month !== (month.match(/^(\d+)\./)?.[1] + '.1월') && (() => { const p = ((a.amount - a.janAmt) / a.janAmt * 100); return <span style={{fontSize:9,fontWeight:600,color:"#6366f1"}}>연{p>=0?"+":""}{p.toFixed(1)}%</span>; })()}
                             </span>
                           )}
                         </div>
