@@ -339,13 +339,15 @@ export default function App() {
 
   // For current month: get existing values, or 0 for template items
   const currentSavings = useMemo(() => {
+    const prevItems = prevMonth ? assets.filter((a) => a.month === prevMonth) : [];
     return assetTemplate
       .filter((name) => SAVINGS_NAMES.includes(name))
       .map((name) => {
         const entry = mAst.find((a) => a.name === name);
-        return { name, amount: entry ? entry.amount : 0, hasData: !!entry };
+        const prev = prevItems.find((a) => a.name === name);
+        return { name, amount: entry ? entry.amount : 0, hasData: !!entry, prevAmt: prev ? prev.amount : 0 };
       });
-  }, [assetTemplate, mAst]);
+  }, [assetTemplate, mAst, assets, prevMonth]);
 
   const currentInvest = useMemo(() => {
     return assetTemplate
