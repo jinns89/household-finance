@@ -350,13 +350,19 @@ export default function App() {
   }, [assetTemplate, mAst, assets, prevMonth]);
 
   const currentInvest = useMemo(() => {
+    const yr = month.match(/^(\d+)\./)?.[1];
+    const janKey = yr ? yr + ".1월" : null;
+    const prevItems = prevMonth ? assets.filter((a) => a.month === prevMonth) : [];
+    const janItems = janKey ? assets.filter((a) => a.month === janKey) : [];
     return assetTemplate
       .filter((name) => INVEST_NAMES.includes(name))
       .map((name) => {
         const entry = mAst.find((a) => a.name === name);
-        return { name, amount: entry ? entry.amount : 0, hasData: !!entry };
+        const prev = prevItems.find((a) => a.name === name);
+        const jan = janItems.find((a) => a.name === name);
+        return { name, amount: entry ? entry.amount : 0, hasData: !!entry, prevAmt: prev ? prev.amount : 0, janAmt: jan ? jan.amount : 0 };
       });
-  }, [assetTemplate, mAst]);
+  }, [assetTemplate, mAst, assets, prevMonth, month]);
 
   // ── Form actions ──
   function resetForm() {
@@ -965,7 +971,7 @@ export default function App() {
                       })()}
                       {janAst && totSavings > 0 && month !== (month.match(/^(\d+)\./)?.[1] + ".1월") && (() => {
                         const b = pctBadge(totSavings, janAst.savings);
-                        return b ? <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1" }}>연간{"전월" + b.text}</span> : null;
+                        return b ? <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1" }}>연간 {b.text}</span> : null;
                       })()}
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{totSavings > 0 ? wonShort(totSavings) : "-"}</span>
@@ -1019,7 +1025,7 @@ export default function App() {
                       })()}
                       {janAst && totInvest > 0 && month !== (month.match(/^(\d+)\./)?.[1] + ".1월") && (() => {
                         const b = pctBadge(totInvest, janAst.invest);
-                        return b ? <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1" }}>연간{"전월" + b.text}</span> : null;
+                        return b ? <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1" }}>연간 {b.text}</span> : null;
                       })()}
                     </div>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{totInvest > 0 ? wonShort(totInvest) : "-"}</span>
@@ -1071,8 +1077,6 @@ export default function App() {
                                 {a.amount > 0 ? wonShort(a.amount) : "미입력"}</div>
                               {a.amount>0&&a.prevAmt>0&&(()=>{const p=((a.amount-a.prevAmt)/a.prevAmt*100);return <div style={{fontSize:9,fontWeight:600,color:p>=0?"#059669":"#dc2626"}}>전월{p>=0?"+":""}{p.toFixed(1)}%</div>})()}
                               {a.amount>0&&a.janAmt>0&&month!==(month.match(/^(\d+)\./)?.[1]+".1월")&&(()=>{const p=((a.amount-a.janAmt)/a.janAmt*100);return <div style={{fontSize:9,fontWeight:600,color:"#6366f1"}}>연간{p>=0?"+":""}{p.toFixed(1)}%</div>})()}
-                              {a.amount > 0 && a.prevAmt > 0 && (() => { const p = ((a.amount - a.prevAmt) / a.prevAmt * 100); return <span style={{fontSize:9,fontWeight:600,color:p>=0?"#059669":"#dc2626",marginRight:4}}>{p>=0?"+":""}{p.toFixed(1)}%</span>; })()}
-                              {a.amount > 0 && a.janAmt > 0 && month !== (month.match(/^(\d+)\./)?.[1] + '.1월') && (() => { const p = ((a.amount - a.janAmt) / a.janAmt * 100); return <span style={{fontSize:9,fontWeight:600,color:"#6366f1"}}>연{p>=0?"+":""}{p.toFixed(1)}%</span>; })()}
                             </div>
                           )}
                         </div>
