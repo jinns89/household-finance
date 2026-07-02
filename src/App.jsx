@@ -904,7 +904,7 @@ export default function App() {
 
           {assetTemplate.length > 0 && (
             <>
-              {prevMonth && (<button onClick={() => setShowPrev(!showPrev)} style={{width:"100%",padding:"9px 0",borderRadius:10,marginBottom:12,border:showPrev?"1.5px solid #6366f1":"1.5px solid #e2e8f0",background:showPrev?"#eef2ff":"#fff",color:showPrev?"#6366f1":"#64748b",fontSize:12,fontWeight:600,cursor:"pointer"}}>{showPrev ? "전월 비교 숨기기" : "전월 비교 보기 (" + prevMonth + ")"}</button>)}
+
               {/* ── Ratio Bar: 예적금 vs 투자 ── */}
               <div style={card}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 12 }}>자산 구성</div>
@@ -1006,7 +1006,7 @@ export default function App() {
                             </span>
                           </div>
                         )}
-                        {showPrev && a.prevAmt > 0 && (<div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:10,color:"#94a3b8"}}>{prevMonth}</span><span style={{fontSize:10,color:"#94a3b8"}}>{wonShort(a.prevAmt)}{a.amount>0?(a.amount>=a.prevAmt?" ▲":" ▼"):""}</span></div>)}
+                        {a.prevAmt > 0 && (<div style={{display:"flex",justifyContent:"space-between",marginTop:2}}><span style={{fontSize:10,color:"#94a3b8"}}>{prevMonth}</span><span style={{fontSize:10,color:"#94a3b8"}}>{wonShort(a.prevAmt)}{a.amount>0&&a.amount!==a.prevAmt?(a.amount>a.prevAmt?" ▲":" ▼"):""}</span></div>)}
                       </div>
                     );
                   })}
@@ -1076,7 +1076,7 @@ export default function App() {
                               <div style={{ fontSize: 12, fontWeight: 700, color: a.amount > 0 ? "#0f172a" : "#cbd5e1" }}>
                                 {a.amount > 0 ? wonShort(a.amount) : "미입력"}</div>
                               {a.amount>0&&a.prevAmt>0&&(()=>{const p=((a.amount-a.prevAmt)/a.prevAmt*100);return <div style={{fontSize:9,fontWeight:600,color:p>=0?"#059669":"#dc2626"}}>전월{p>=0?"+":""}{p.toFixed(1)}%</div>})()}
-                              {a.amount>0&&a.janAmt>0&&month!==(month.match(/^(\d+)\./)?.[1]+".1월")&&(()=>{const p=((a.amount-a.janAmt)/a.janAmt*100);return <div style={{fontSize:9,fontWeight:600,color:"#6366f1"}}>연간{p>=0?"+":""}{p.toFixed(1)}%</div>})()}
+
                             </div>
                           )}
                         </div>
@@ -1105,7 +1105,7 @@ export default function App() {
                             + 메모 추가
                           </div>
                         )}
-                        {showPrev && a.prevAmt > 0 && (<div style={{display:"flex",justifyContent:"space-between",marginTop:4,marginLeft:12}}><span style={{fontSize:10,color:"#94a3b8"}}>{prevMonth}</span><span style={{fontSize:10,color:"#94a3b8"}}>{wonShort(a.prevAmt)}{a.amount>0?(a.amount>=a.prevAmt?" ▲":" ▼"):""}</span></div>)}
+                        {a.prevAmt > 0 && (<div style={{display:"flex",justifyContent:"space-between",marginTop:4,marginLeft:12}}><span style={{fontSize:10,color:"#94a3b8"}}>{prevMonth}</span><span style={{fontSize:10,color:"#94a3b8"}}>{wonShort(a.prevAmt)}{a.amount>0&&a.amount!==a.prevAmt?(a.amount>a.prevAmt?" ▲":" ▼"):""}</span></div>)}
                         {/* Edit mode */}
                         {isEditing && (
                           <div style={{ marginTop: 6, marginLeft: 12 }}>
