@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>팀. 피오르드🏔️</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      background: #f2f4f7; color: #1a1a2e;
+      max-width: 430px; margin: 0 auto; min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    .app-header {
+      background: #fff; padding: 16px 20px 12px;
+      border-bottom: 1px solid #eee; position: sticky; top: 0; z-index: 100;
+    }
+    .header-top { display: flex; align-items: flex-start; justify-content: space-between; }
+    .trip-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #9fb0c8; margin-bottom: 2px; }
+    .trip-title { font-size: 21px; font-weight: 800; color: #1a1a2e; }
+    .header-flags { font-size: 22px; letter-spacing: 2px; padding-top: 2px; }
+    .route-bar { display: flex; align-items: center; gap: 3px; margin-top: 10px; }
+    .route-city-btn {
+      font-size: 11px; font-weight: 800; color: #3a7bd5;
+      background: #e8f0fe; border: none; cursor: pointer;
+      padding: 3px 7px; border-radius: 6px; font-family: inherit; flex-shrink: 0;
+    }
+    .route-city-btn:active { background: #cddcf8; }
+    .route-divider { flex: 1; display: flex; align-items: center; gap: 2px; }
+    .route-line-sm { flex: 1; height: 1.5px; background: #d8e2ee; }
+    .route-icon-sm { font-size: 12px; flex-shrink: 0; }
+
+    /* Tooltip */
+    .tooltip-popup {
+      position: fixed; background: #1a1a2e; color: #fff;
+      border-radius: 12px; padding: 11px 14px; font-size: 11.5px;
+      z-index: 500; box-shadow: 0 8px 28px rgba(0,0,0,.3);
+      min-width: 175px; max-width: 210px; pointer-events: none; transition: opacity 0.15s;
+    }
+    .tooltip-popup.hidden { opacity: 0; pointer-events: none; }
+    .tooltip-popup::before {
+      content: ''; position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+      border: 7px solid transparent; border-bottom: 7px solid #1a1a2e; border-top: 0;
+    }
+    .tt-title { font-weight: 800; font-size: 12px; color: #7eb4f5; margin-bottom: 7px; }
+    .tt-row { padding: 2px 0; color: rgba(255,255,255,.85); line-height: 1.4; }
+    .tt-row strong { color: #fff; }
+
+    /* ── CALENDAR ── */
+    .cal-card {
+      background: #fff; border-radius: 16px;
+      margin: 12px 14px 0; padding: 13px 13px 11px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .cal-month { font-size: 13px; font-weight: 800; color: #1a1a2e; }
+    .cal-legend { display: flex; gap: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #8b9ab0; font-weight: 600; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 3px; }
+    .ld-depart { background: #ff7043; } .ld-norway { background: #3a7bd5; } .ld-denmark { background: #f5a623; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-weekday { text-align: center; font-size: 9px; font-weight: 700; color: #9fb0c8; padding: 2px 0 5px; }
+    .cal-weekday:first-child { color: #e57373; } .cal-weekday:last-child { color: #7eb4f5; }
+    .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border-radius: 7px; color: #9fb0c8; }
+    .cal-day.sun { color: #e57373; } .cal-day.sat { color: #7eb4f5; }
+    .cal-day.trip-day { cursor: pointer; transition: filter 0.1s; }
+    .cal-day.trip-day:active { filter: brightness(0.88); }
+    .cal-day.depart { background: #ff7043; color: #fff; }
+    .cal-day.norway { background: #3a7bd5; color: #fff; border-radius: 0; }
+    .cal-day.norway.first { border-radius: 7px 0 0 7px; } .cal-day.norway.last { border-radius: 0 7px 7px 0; }
+    .cal-day.denmark { background: #f5a623; color: #fff; border-radius: 0; }
+    .cal-day.denmark.first { border-radius: 7px 0 0 7px; } .cal-day.denmark.last { border-radius: 0 7px 7px 0; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes flashDay { 0%,100%{background:#fff} 25%{background:#dbeaff} 50%{background:#e8f0fe} }
+    .day-header.flash { animation: flashDay 1s ease; }
+    @keyframes highlightPlace {
+      0%{box-shadow:0 0 0 0px #3a7bd5,0 1px 3px rgba(0,0,0,.05)}
+      25%{box-shadow:0 0 0 3px #3a7bd5,0 1px 3px rgba(0,0,0,.05)}
+      100%{box-shadow:0 0 0 0px transparent,0 1px 3px rgba(0,0,0,.05)}
+    }
+    .place-card.highlighted,.stay-card.highlighted { animation: highlightPlace 1.6s ease-out; }
+
+    /* ── CONTENT ── */
+    .content { padding: 14px 14px 90px; }
+    .panel { display: none; } .panel.active { display: block; }
+
+    .country-divider { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; }
+    .country-divider-line { flex: 1; height: 1px; background: #e8ecf2; }
+    .country-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; flex-shrink: 0; }
+    .badge-norway { background: #e8f0fe; color: #2a6dd9; }
+    .badge-denmark { background: #fff4e0; color: #d97706; }
+
+    /* ── DAY CARDS ── */
+    .day-group { margin-bottom: 6px; scroll-margin-top: 100px; }
+    .day-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px; background: #fff;
+      border-radius: 14px; cursor: pointer; user-select: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .day-header.open { border-radius: 14px 14px 0 0; box-shadow: none; }
+
+    /* Date badge — shows day-of-month + weekday, no "DAY N" */
+    .day-date-badge {
+      width: 44px; min-height: 44px; border-radius: 10px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-weight: 700; flex-shrink: 0; padding: 5px 3px; gap: 1px;
+    }
+    .ddb-date { font-size: 22px; line-height: 1; font-weight: 800; }
+    .ddb-dow  { font-size: 10px; opacity: 0.72; letter-spacing: 0.2px; }
+    .dnb-depart  { background: #fff1ec; color: #ff7043; }
+    .dnb-norway  { background: #e8f0fe; color: #2a6dd9; }
+    .dnb-denmark { background: #fff4e0; color: #d97706; }
+
+    .day-info { flex: 1; min-width: 0; }
+    .day-place { font-size: 17px; font-weight: 800; color: #1a1a2e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .day-sub-label { font-size: 12px; color: #9fb0c8; margin-top: 1px; }
+    .day-flag { font-size: 18px; flex-shrink: 0; }
+    .chevron { font-size: 11px; color: #c8d2e0; transition: transform 0.2s; flex-shrink: 0; }
+    .day-header.open .chevron { transform: rotate(180deg); }
+
+    .day-body {
+      background: #fff; border-radius: 0 0 14px 14px;
+      border-top: 1px solid #f2f4f7;
+      box-shadow: 0 2px 6px rgba(0,0,0,.05);
+    }
+    .day-body.hidden { display: none; }
+
+    /* ── FLIGHT ITINERARY (연속 타임라인) ── */
+    .flight-leg {
+      display: flex; align-items: stretch; gap: 0;
+      padding: 10px 14px; border-bottom: 1px solid #f5f7fa;
+    }
+    .flight-leg:last-child { border-bottom: none; }
+    .fl-time-col { min-width: 48px; text-align: right; padding-right: 10px; font-size: 13px; font-weight: 700; color: #7a8fa8; padding-top: 3px; flex-shrink: 0; }
+    .fl-spine { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .fl-dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid #3a7bd5; background: #fff; flex-shrink: 0; }
+    .fl-dot.orange-dot { border-color: #ff7043; background: #ff7043; }
+    .fl-dot.blue-dot   { border-color: #3a7bd5; background: #3a7bd5; }
+    .fl-dot.green-dot  { border-color: #27ae60; background: #27ae60; }
+    .fl-dot.transit-dot{ border-color: #5a7dd5; background: #fff; }
+    .fl-line { width: 2px; flex: 1; background: #cddcf8; min-height: 10px; margin: 2px 0; }
+    .fl-line.dashed { background: repeating-linear-gradient(to bottom,#cddcf8 0,#cddcf8 4px,transparent 4px,transparent 8px); }
+    .fl-info { flex: 1; padding-left: 10px; }
+    .fl-airport { font-size: 18px; font-weight: 800; color: #1a1a2e; }
+    .fl-airport .city-sm { font-size: 12px; font-weight: 500; color: #9fb0c8; }
+    .fl-badge { font-size: 12px; font-weight: 700; margin-top: 3px; }
+    .fl-badge.orange { color: #ff7043; }
+    .fl-badge.blue   { color: #3a7bd5; }
+    .fl-badge.green  { color: #27ae60; }
+    .fl-badge.muted  { color: #8b9ab0; }
+    .fl-ref { font-size: 10px; color: #b8c5d0; margin-top: 1px; line-height: 1.35; }
+    .fl-in-flight { font-size: 11px; color: #c0ccda; padding-top: 4px; }
+    .transit-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 700; color: #5a7dd5;
+      background: #f0f4ff; border-radius: 20px; padding: 2px 8px; margin-top: 5px;
+    }
+
+    /* ── SCHEDULE ITEMS ── */
+    .sch-item { display: flex; gap: 10px; padding: 11px 14px; border-bottom: 1px solid #f5f7fa; }
+    .sch-item:last-child { border-bottom: none; }
+    .sch-time { font-size: 13px; color: #7a8fa8; font-weight: 700; min-width: 44px; padding-top: 3px; flex-shrink: 0; }
+    .sch-spine { display: flex; flex-direction: column; align-items: center; padding-top: 4px; flex-shrink: 0; }
+    .spine-dot { width: 7px; height: 7px; border-radius: 50%; background: #d0daea; flex-shrink: 0; }
+    .spine-dot.hi { background: #3a7bd5; } .spine-dot.hi-or { background: #ff7043; }
+    .spine-line { width: 2px; flex: 1; background: #eef0f6; min-height: 14px; }
+    .sch-body { flex: 1; }
+    /* Place name — most prominent */
+    .sch-label { font-size: 16px; font-weight: 700; color: #1a1a2e; line-height: 1.3; }
+    /* Secondary description */
+    .sch-sub { font-size: 13px; color: #8b9ab0; margin-top: 3px; }
+    /* Booking ref / minor detail — smallest, muted */
+    .sch-ref { font-size: 11px; color: #b8c5d0; margin-top: 2px; line-height: 1.35; }
+    /* Route label (A → B 세로 흐름) */
+    .sch-route-label { display: flex; flex-direction: column; gap: 1px; margin-bottom: 5px; }
+    .srl-from { font-size: 16px; font-weight: 700; color: #1a1a2e; }
+    .srl-via  { font-size: 12px; color: #9fb0c8; padding: 2px 0 2px 1px; }
+    .srl-to   { font-size: 16px; font-weight: 700; color: #1a1a2e; }
+    .car-info-panel { margin-top: 8px; background: #f0f4ff; border-radius: 9px; padding: 9px 11px; display: flex; flex-direction: column; gap: 4px; }
+    .car-info-panel.hidden { display: none; }
+    .cip-car { font-size: 14px; font-weight: 800; color: #1a1a2e; }
+    .cip-row { font-size: 12px; color: #5a6a80; }
+    .cip-price { font-size: 14px; font-weight: 800; color: #1a1a2e; margin-top: 3px; }
+    .cip-price span { font-size: 11px; font-weight: 400; color: #9fb0c8; }
+    .sch-tag { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 20px; font-weight: 700; margin-top: 5px; }
+    .t-move { background: #e8f5e9; color: #27ae60; }
+    .t-tour { background: #e8f0fe; color: #2a6dd9; }
+    .t-hotel { background: #f3e5f5; color: #8e44ad; }
+    .t-depart { background: #ffeee8; color: #ff7043; }
+
+    .sch-place-link { cursor: pointer; }
+    .place-arrow { font-size: 10px; color: #3a7bd5; font-weight: 800; background: #e8f0fe; padding: 1px 4px; border-radius: 4px; margin-left: 5px; vertical-align: middle; }
+    .sch-place-link:active { opacity: 0.7; }
+
+    /* ── STAY CARDS ── */
+    .stay-card {
+      background: #fff; border-radius: 14px; margin-bottom: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05); overflow: hidden; scroll-margin-top: 100px;
+    }
+    .stay-link-btn {
+      display: flex; align-items: center; gap: 6px;
+      margin: 2px 14px 12px; background: #f0f4ff;
+      border-radius: 10px; padding: 10px 12px;
+      font-size: 14px; font-weight: 700; color: #3a7bd5; text-decoration: none;
+    }
+    .stay-link-btn:active { opacity: 0.7; }
+    .stay-top { display: flex; align-items: flex-start; gap: 12px; padding: 14px; }
+    .stay-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 21px; flex-shrink: 0; }
+    .si-blue{background:#e8f0fe} .si-orange{background:#fff4e0} .si-green{background:#e8f5e9} .si-purple{background:#f3e5f5}
+    .stay-main { flex: 1; }
+    .stay-name { font-size: 16px; font-weight: 700; color: #1a1a2e; }
+    .stay-sub { font-size: 12px; color: #8b9ab0; margin-top: 2px; }
+    .stay-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .stay-date-tag {
+      background: #f2f4f7; color: #5a6a80;
+      font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 8px;
+    }
+    .price-btn { font-size: 16px; background: none; border: none; cursor: pointer; padding: 3px 5px; border-radius: 8px; line-height: 1; }
+    .price-btn:active { background: #f2f4f7; }
+    .price-panel { background: #fffbf0; border-top: 1px solid #f0e6bb; padding: 10px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .price-panel.hidden { display: none; }
+    .price-amount { font-size: 14px; font-weight: 800; color: #1a1a2e; flex: 1; min-width: 100px; }
+    .price-chip { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .chip-paid { background: #e8f5e9; color: #27ae60; }
+    .chip-prepaid { background: #fff3e0; color: #e67e22; }
+    .chip-meal-yes { background: #e8f0fe; color: #2a6dd9; }
+    .chip-meal-no { background: #f2f4f7; color: #8b9ab0; }
+    .chip-scheduled { background: #f0f0ff; color: #5c5cd6; }
+    .chip-norefund { background: #fff0f0; color: #e53935; }
+    .chip-unpaid { background: #fff3e0; color: #f57c00; }
+    .chip-freecxl { background: #e8f5e9; color: #43a047; }
+    .price-note { font-size: 11.5px; color: #8b9ab0; width: 100%; margin-top: 3px; line-height: 1.4; }
+    .breakfast-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; background: #e8f5e9; color: #27ae60; border-radius: 20px; padding: 2px 8px; margin-top: 4px; }
+    .sch-tag-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+    .sch-price-panel { background: #fffbf0; border: 1px solid #f0e6bb; border-radius: 9px; padding: 8px 10px; display: flex; align-items: flex-start; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+    .sch-price-panel.hidden { display: none; }
+
+    /* ── 추천 장소 ── */
+    .day-tips { border-top: 1px solid #f2f4f7; }
+    .day-tips-header { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px 10px; cursor: pointer; user-select: none; }
+    .day-tips-header:active { background: #f8f9fb; }
+    .day-tips-title { font-size: 12px; font-weight: 800; color: #9fb0c8; letter-spacing: 0.5px; }
+    .tips-chevron { font-size: 10px; color: #c8d2e0; transition: transform 0.2s; }
+    .tips-chevron.open { transform: rotate(180deg); }
+    .day-tips-body { padding: 0 14px 12px; }
+    .day-tips-body.hidden { display: none; }
+    .tip-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f7fa; }
+    .tip-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .tip-emoji { font-size: 18px; flex-shrink: 0; width: 26px; text-align: center; margin-top: 1px; }
+    .tip-name { font-size: 14px; font-weight: 700; color: #1a1a2e; }
+    .tip-desc { font-size: 12px; color: #8b9ab0; margin-top: 3px; line-height: 1.4; }
+    .stay-divider { height: 1px; background: #f2f4f7; margin: 0 14px; }
+    .stay-rows { padding: 10px 14px 13px; }
+    .stay-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 14px; color: #5a6a80; }
+    .stay-row-ico { font-size: 13px; width: 18px; text-align: center; }
+    .stay-row strong { color: #1a1a2e; font-weight: 600; }
+
+    /* ── FLIGHT CARDS (교통탭) ── */
+    .flight-card { background: #fff; border-radius: 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.05); overflow: hidden; }
+    .fl-header { background: #f8f9fb; padding: 10px 14px 8px; display: flex; align-items: center; justify-content: space-between; }
+    .fl-num { font-size: 15px; font-weight: 900; color: #1a1a2e; }
+    .fl-booking { font-size: 11px; color: #8b9ab0; } .fl-booking strong { color: #3a7bd5; }
+    .fl-body { padding: 12px 14px 14px; }
+    .fl-route { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .fl-ap { text-align: center; }
+    .fl-code { font-size: 20px; font-weight: 900; color: #1a1a2e; }
+    .fl-city { font-size: 10px; color: #8b9ab0; margin-top: 1px; }
+    .fl-time { font-size: 13px; font-weight: 700; color: #1a1a2e; margin-top: 3px; }
+    .fl-date { font-size: 10px; color: #9fb0c8; margin-top: 1px; }
+    .fl-mid { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .fl-dur { font-size: 10px; color: #8b9ab0; font-weight: 600; }
+    .fl-bar { width: 100%; display: flex; align-items: center; gap: 3px; }
+    .fl-bar-line { flex: 1; height: 1.5px; background: #d0daea; }
+    .fl-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .fl-chip { font-size: 11px; background: #f2f4f7; color: #5a6a80; padding: 4px 9px; border-radius: 20px; font-weight: 500; }
+    .car-card { background: linear-gradient(135deg,#1a1a2e 0%,#2a4080 100%); border-radius: 14px; padding: 16px; margin-bottom: 8px; color: #fff; }
+    .car-title { font-size: 14px; font-weight: 800; margin-bottom: 3px; }
+    .car-sub { font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 12px; }
+    .car-rows { display: flex; flex-direction: column; gap: 6px; }
+    .car-row { font-size: 12px; color: rgba(255,255,255,.75); display: flex; gap: 8px; }
+    .car-row span { color: #fff; font-weight: 600; }
+
+    /* ── MAP ── */
+    .map-section { margin-bottom: 14px; }
+    .map-title-row { display: flex; align-items: center; margin-bottom: 8px; }
+    .map-title { font-size: 13px; font-weight: 800; color: #1a1a2e; }
+    .map-container { background: #e8ecf2; border-radius: 14px; overflow: hidden; position: relative; height: 300px; }
+    #tripMap { width: 100%; height: 100%; }
+    .leaflet-popup-content-wrapper { border-radius: 10px !important; font-family: -apple-system,'Apple SD Gothic Neo',sans-serif; box-shadow: 0 4px 16px rgba(0,0,0,.15) !important; }
+    .leaflet-popup-content { font-size: 12px; margin: 8px 12px; }
+    .map-open-btn { display: flex; align-items: center; gap: 6px; justify-content: center; background: #fff; border: 1.5px solid #e4e8ef; border-radius: 12px; padding: 10px; font-size: 12px; font-weight: 700; color: #1a1a2e; text-decoration: none; margin-top: 6px; }
+
+    /* ── PLACE CARDS ── */
+    .place-card { background: #fff; border-radius: 12px; display: flex; align-items: center; gap: 11px; padding: 11px 13px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.05); scroll-margin-top: 100px; }
+    .place-emo { font-size: 26px; width: 44px; text-align: center; flex-shrink: 0; }
+    .place-body { flex: 1; min-width: 0; }
+    .place-name { font-size: 13.5px; font-weight: 700; color: #1a1a2e; }
+    .place-desc { font-size: 11.5px; color: #8b9ab0; margin-top: 2px; }
+    .place-tag-row { display: flex; gap: 5px; margin-top: 4px; flex-wrap: wrap; }
+    .ptag { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 700; }
+    .ptag-nature{background:#e8f5e9;color:#27ae60} .ptag-city{background:#e8f0fe;color:#2a6dd9}
+    .ptag-history{background:#f3e5f5;color:#8e44ad} .ptag-view{background:#fff3e0;color:#e67e22}
+    .place-star { font-size: 16px; flex-shrink: 0; }
+
+    .memo-box { background: #fffbf0; border: 1.5px dashed #f5c842; border-radius: 13px; padding: 13px 14px; margin-bottom: 10px; }
+    .memo-hd { font-size: 11px; font-weight: 800; color: #b08b14; margin-bottom: 5px; }
+    .memo-txt { font-size: 12.5px; color: #6b5a2a; line-height: 1.65; }
+
+    /* ── TAB BAR ── */
+    .tab-bar {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px; background: rgba(255,255,255,0.97);
+      backdrop-filter: blur(10px); border-top: 1px solid #eaeef4;
+      display: flex; z-index: 200; padding-bottom: env(safe-area-inset-bottom);
+    }
+    .tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 4px 7px; background: none; border: none; cursor: pointer; font-size: 10px; color: #aab8cc; font-weight: 600; }
+    .tab-btn .ti { font-size: 21px; }
+    .tab-btn.active { color: #2a6dd9; }
+    .tab-dot { width: 4px; height: 4px; border-radius: 50%; background: #2a6dd9; margin-top: 1px; }
+    .sec-title { font-size: 11px; font-weight: 700; color: #8b9ab0; text-transform: uppercase; letter-spacing: 1.2px; margin: 18px 0 8px; }
+    .sec-title:first-child { margin-top: 0; }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="app-header">
+  <div class="header-top">
+    <div>
+      <div class="trip-eyebrow">아름다운여행길</div>
+      <div class="trip-title">팀. 피오르드🏔️</div>
+    </div>
+    <div class="header-flags">🇳🇴🇩🇰</div>
+  </div>
+  <div class="route-bar">
+    <button class="route-city-btn" onclick="showTooltip(event,'icn-dep')">ICN</button>
+    <div class="route-divider"><div class="route-line-sm"></div><div class="route-icon-sm">✈️</div><div class="route-line-sm"></div></div>
+    <button class="route-city-btn" onclick="showTooltip(event,'cph-via')">CPH</button>
+    <div class="route-divider"><div class="route-line-sm"></div><div class="route-icon-sm">✈️</div><div class="route-line-sm"></div></div>
+    <button class="route-city-btn" onclick="showTooltip(event,'bgo')">BGO</button>
+    <div class="route-divider"><div class="route-line-sm"></div><div class="route-icon-sm">🚗</div><div class="route-line-sm"></div></div>
+    <button class="route-city-btn" onclick="showTooltip(event,'cph-ret')">CPH</button>
+    <div class="route-divider"><div class="route-line-sm"></div><div class="route-icon-sm">✈️</div><div class="route-line-sm"></div></div>
+    <button class="route-city-btn" onclick="showTooltip(event,'icn-arr')">ICN</button>
+  </div>
+</div>
+
+<!-- ── CALENDAR ── -->
+<div class="cal-card">
+  <div class="cal-header">
+    <div class="cal-month">2026년 8월</div>
+    <div class="cal-legend">
+      <div class="legend-item"><div class="legend-dot ld-depart"></div>출발</div>
+      <div class="legend-item"><div class="legend-dot ld-norway"></div>노르웨이</div>
+      <div class="legend-item"><div class="legend-dot ld-denmark"></div>덴마크</div>
+    </div>
+  </div>
+  <div class="cal-grid">
+    <div class="cal-weekday">일</div><div class="cal-weekday">월</div><div class="cal-weekday">화</div>
+    <div class="cal-weekday">수</div><div class="cal-weekday">목</div><div class="cal-weekday">금</div><div class="cal-weekday">토</div>
+    <div class="cal-day"></div><div class="cal-day"></div><div class="cal-day"></div>
+    <div class="cal-day"></div><div class="cal-day"></div><div class="cal-day"></div>
+    <div class="cal-day sat">1</div>
+    <div class="cal-day sun">2</div><div class="cal-day">3</div><div class="cal-day">4</div>
+    <div class="cal-day">5</div><div class="cal-day">6</div>
+    <div class="cal-day trip-day depart" onclick="scrollToDay(0)">7</div>
+    <div class="cal-day trip-day norway first sat" onclick="scrollToDay(1)">8</div>
+    <div class="cal-day trip-day norway sun" onclick="scrollToDay(2)">9</div>
+    <div class="cal-day trip-day norway" onclick="scrollToDay(3)">10</div>
+    <div class="cal-day trip-day norway" onclick="scrollToDay(4)">11</div>
+    <div class="cal-day trip-day norway" onclick="scrollToDay(5)">12</div>
+    <div class="cal-day trip-day norway" onclick="scrollToDay(6)">13</div>
+    <div class="cal-day trip-day norway last" onclick="scrollToDay(7)">14</div>
+    <div class="cal-day trip-day denmark first sat" onclick="scrollToDay(8)">15</div>
+    <div class="cal-day trip-day denmark last sun" onclick="scrollToDay(9)">16</div>
+    <div class="cal-day">17</div><div class="cal-day">18</div><div class="cal-day">19</div>
+    <div class="cal-day">20</div><div class="cal-day">21</div><div class="cal-day sat">22</div>
+    <div class="cal-day sun">23</div><div class="cal-day">24</div><div class="cal-day">25</div>
+    <div class="cal-day">26</div><div class="cal-day">27</div><div class="cal-day">28</div><div class="cal-day sat">29</div>
+    <div class="cal-day sun">30</div><div class="cal-day">31</div>
+  </div>
+</div>
+
+<!-- ── CONTENT ── -->
+<div class="content">
+
+  <!-- ════ 일정 ════ -->
+  <div class="panel active" id="panel-itinerary">
+
+    <!-- ✈️ 8/7(금) 출발 ~ 8/8(토) 베르겐 도착 : 이동일 통합 카드 -->
+    <div class="day-group" id="day-0">
+      <div class="day-header open" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-depart">
+          <div class="ddb-date">7</div>
+          <div class="ddb-dow">금→토</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">인천 → 베르겐 ✈️</div>
+          <div class="day-sub-label">8/7 출발 · 8/8 도착 · 이동일</div>
+        </div>
+        <div class="day-flag">🇰🇷</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body">
+        <!-- ICN 출발 -->
+        <div class="flight-leg">
+          <div class="fl-time-col">23:35</div>
+          <div class="fl-spine">
+            <div class="fl-dot orange-dot"></div>
+            <div class="fl-line"></div>
+          </div>
+          <div class="fl-info">
+            <div class="fl-airport">ICN <span class="city-sm">서울 인천</span></div>
+            <div class="fl-badge orange">SK0988 · 출발 · 8/7(금)</div>
+            <div class="fl-ref">Terminal 2 · A350-900 · DG223P</div>
+          </div>
+        </div>
+        <!-- 비행 중 -->
+        <div class="flight-leg">
+          <div class="fl-time-col" style="color:#c0ccda;padding-top:10px">13h 25m</div>
+          <div class="fl-spine">
+            <div class="fl-line dashed" style="min-height:32px"></div>
+          </div>
+          <div class="fl-info">
+            <div class="fl-in-flight">✈️ 비행 중</div>
+          </div>
+        </div>
+        <!-- CPH 도착 · 환승 -->
+        <div class="flight-leg">
+          <div class="fl-time-col">06:00</div>
+          <div class="fl-spine">
+            <div class="fl-dot transit-dot"></div>
+            <div class="fl-line"></div>
+          </div>
+          <div class="fl-info">
+            <div class="fl-airport">CPH <span class="city-sm">코펜하겐</span></div>
+            <div class="fl-badge muted">환승 · 8/8(토)</div>
+            <div class="fl-ref">Kastrup Terminal 3 · 대기 2시간 15분</div>
+            <div class="transit-chip">🔄 환승 대기</div>
+          </div>
+        </div>
+        <!-- CPH 출발 -->
+        <div class="flight-leg">
+          <div class="fl-time-col">08:15</div>
+          <div class="fl-spine">
+            <div class="fl-dot blue-dot"></div>
+            <div class="fl-line"></div>
+          </div>
+          <div class="fl-info">
+            <div class="fl-airport">CPH <span class="city-sm">코펜하겐</span></div>
+            <div class="fl-badge blue">SK2862 · 출발</div>
+            <div class="fl-ref">Terminal 3 · A319 · 1시간 25분</div>
+          </div>
+        </div>
+        <!-- BGO 도착 -->
+        <div class="flight-leg">
+          <div class="fl-time-col">09:40</div>
+          <div class="fl-spine">
+            <div class="fl-dot green-dot"></div>
+          </div>
+          <div class="fl-info">
+            <div class="fl-airport">BGO <span class="city-sm">베르겐 🇳🇴</span></div>
+            <div class="fl-badge green">도착 ✅ · 8/8(토)</div>
+            <div class="fl-ref">Bergen Flesland Airport</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8/8 베르겐 활동 -->
+    <div class="day-group" id="day-1">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-norway">
+          <div class="ddb-date">8</div>
+          <div class="ddb-dow">토</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">베르겐</div>
+          <div class="day-sub-label">8월 8일</div>
+        </div>
+        <div class="day-flag">🇳🇴</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time">11:00</div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body sch-place-link" onclick="toggleCarInfo()">
+            <div class="sch-label">🚗 렌트카 픽업</div>
+            <div class="sch-sub">공항 렌터카 센터 · Hertz</div>
+            <div class="sch-tag t-move">이동</div>
+            <div class="car-info-panel hidden" id="car-info">
+              <div class="cip-car">🚙 Toyota Yaris Cross 4x4 Aut.</div>
+              <div class="cip-row">Compact · 4WD · 자동변속기 · 그룹 C3</div>
+              <div class="cip-price">14,971.55 NOK <span>후지불</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot"></div></div>
+          <div class="sch-body sch-place-link" onclick="window.open('https://www.airbnb.co.kr/rooms/907005514465105181?check_in=2026-08-08&check_out=2026-08-09&guests=1&adults=4&s=67&unique_share_id=804c69ca-62d4-40e5-be3d-968649d04b17','_blank')">
+            <div class="sch-label">🏠 에어비앤비 체크인 <span class="place-arrow">↗</span></div>
+            <div class="sch-sub">베르겐 숙소</div>
+            <div class="sch-tag-row">
+              <div class="sch-tag t-hotel" style="margin-top:0">숙소</div>
+              <button class="price-btn" onclick="event.stopPropagation();togglePrice('si-2')" style="font-size:14px">💰</button>
+            </div>
+            <div class="sch-price-panel hidden" id="price-si-2" onclick="event.stopPropagation()">
+              <div class="price-amount">642,629원</div>
+              <span class="price-chip chip-scheduled">7/26 청구예정</span>
+            </div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 오늘 가볼 만한 곳</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">🏘️</div><div><div class="tip-name">브뤼겐 (Bryggen)</div><div class="tip-desc">유네스코 세계유산 · 14세기 한자동맹 목조 건물군, 숙소에서 도보권</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">⛰️</div><div><div class="tip-name">플뢰이엔 산 (Fløibanen)</div><div class="tip-desc">케이블카로 올라가는 베르겐 최고 전망대 · 왕복 약 30분</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🐟</div><div><div class="tip-name">피쉬마켓 (Fisketorget)</div><div class="tip-desc">항구 야외 수산시장 · 신선한 연어·새우 시식 및 구매 가능</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏛️</div><div><div class="tip-name">브뤼겐스 박물관 (Bryggens Museum)</div><div class="tip-desc">브뤼겐 지구 12세기 고고학 유물 전시</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🎨</div><div><div class="tip-name">코데 미술관 (KODE Art Museum)</div><div class="tip-desc">뭉크·피카소 등 소장, 북유럽 최대 미술 컬렉션</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="day-group" id="day-2">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-norway">
+          <div class="ddb-date">9</div>
+          <div class="ddb-dow">일</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">베르겐 → 구드방겐 → 플롬</div>
+          <div class="day-sub-label">8월 9일</div>
+        </div>
+        <div class="day-flag">🇳🇴</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body">
+            <div class="sch-route-label">
+              <div class="srl-from">🚗 베르겐</div>
+              <div class="srl-via">↓ 소그네피오르 방향</div>
+              <div class="srl-to">구드방겐</div>
+            </div>
+            <div class="sch-tag t-move">이동</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot"></div></div>
+          <div class="sch-body sch-place-link" onclick="window.open('https://maps.app.goo.gl/vXALDtZ43KKbLwYV6','_blank')">
+            <div class="sch-label">🏡 방스가든 게스트하우스 <span class="place-arrow">↗</span></div>
+            <div class="sch-sub">플롬 근처</div>
+            <span class="breakfast-badge">🍳 조식포함</span>
+            <div class="sch-tag-row">
+              <div class="sch-tag t-hotel" style="margin-top:0">숙소</div>
+              <button class="price-btn" onclick="event.stopPropagation();togglePrice('si-3')" style="font-size:14px">💰</button>
+            </div>
+            <div class="sch-price-panel hidden" id="price-si-3" onclick="event.stopPropagation()">
+              <div class="price-amount">1,590 NOK (30% 선결제)</div>
+              <span class="price-chip chip-prepaid">선결제완료</span>
+              <span class="price-chip chip-freecxl">3일전 무료취소</span>
+              <div class="price-note">나머지 금액은 현장결제</div>
+            </div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 오늘 가볼 만한 곳</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">🛣️</div><div><div class="tip-name">스탈하임 전망대 (Stalheim)</div><div class="tip-desc">구드방겐 직전, 13개 헤어핀 커브 절벽 도로</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🚢</div><div><div class="tip-name">뇨뢰피오르 크루즈 (Nærøyfjord)</div><div class="tip-desc">유네스코 세계유산 최협 피오르 · 구드방겐↔플롬 운항</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🛖</div><div><div class="tip-name">나르다르헤임르 바이킹 빌리지</div><div class="tip-desc">구드방겐 내 실제 규모 바이킹 마을 체험</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">⛪</div><div><div class="tip-name">운드레달 목조교회 (Undredal Stave Church)</div><div class="tip-desc">노르웨이 현존 최소 목조교회 · 배 타고 30분</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏔️</div><div><div class="tip-name">스테가스테인 전망대 (Stegastein)</div><div class="tip-desc">아우를란 위 650m 절벽 돌출 전망 데크</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="day-group" id="day-3">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-norway">
+          <div class="ddb-date">10</div>
+          <div class="ddb-dow">월</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">로엔</div>
+          <div class="day-sub-label">8월 10일</div>
+        </div>
+        <div class="day-flag">🇳🇴</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body">
+            <div class="sch-route-label">
+              <div class="srl-from">🚗 플롬</div>
+              <div class="srl-via">↓ 뢰르달 터널 경유 · 스트린 북쪽</div>
+              <div class="srl-to">로엔</div>
+            </div>
+            <div class="sch-tag t-move">이동</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot"></div></div>
+          <div class="sch-body sch-place-link" onclick="window.open('https://maps.app.goo.gl/oGa3cZc4M4ZNf4KA8','_blank')">
+            <div class="sch-label">⛺ 네셋트 피요르드캠핑 <span class="place-arrow">↗</span></div>
+            <div class="sch-sub">로엔 피오르</div>
+            <div class="sch-tag-row">
+              <div class="sch-tag t-hotel" style="margin-top:0">숙소</div>
+              <button class="price-btn" onclick="event.stopPropagation();togglePrice('si-4')" style="font-size:14px">💰</button>
+            </div>
+            <div class="sch-price-panel hidden" id="price-si-4" onclick="event.stopPropagation()">
+              <div class="price-amount">621,404원</div>
+              <span class="price-chip chip-scheduled">8/6 결제예정</span>
+            </div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 오늘 가볼 만한 곳</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">🚂</div><div><div class="tip-name">플롬 산악열차 (Flåmsbana)</div><div class="tip-desc">866m 고도차, 세계에서 가장 가파른 여객열차 · 예약 권장</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">💧</div><div><div class="tip-name">쇼포센 폭포 (Kjosfossen)</div><div class="tip-desc">플롬스바나 중간 정차역, 93m 높이 폭포</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🛗</div><div><div class="tip-name">로엔 스카이리프트 (Loen Skylift)</div><div class="tip-desc">세계 최급경사 케이블카 · 1011m 정상 이너피오르 파노라마</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">❄️</div><div><div class="tip-name">브릭스달 빙하 (Briksdalsbreen)</div><div class="tip-desc">요스테달스브레엔 국립공원 빙하 끝자락 트레킹</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🌊</div><div><div class="tip-name">이너피오르 (Innvikfjorden)</div><div class="tip-desc">로엔 앞 맑은 초록빛 피오르 · 캠핑장에서 바로 보임</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="day-group" id="day-4">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-norway">
+          <div class="ddb-date">11</div>
+          <div class="ddb-dow">화</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">로엔 → 헬레실트 → 게이랑에르</div>
+          <div class="day-sub-label">8월 11일</div>
+        </div>
+        <div class="day-flag">🇳🇴</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body">
+            <div class="sch-route-label">
+              <div class="srl-from">🚗 로엔</div>
+              <div class="srl-via">↓ 순뫼레 방향 해안 드라이브</div>
+              <div class="srl-to">헬레실트</div>
+            </div>
+            <div class="sch-tag t-move">이동</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body sch-place-link" onclick="goToPlace('place-geiranger')">
+            <div class="sch-route-label">
+              <div class="srl-from">⛴️ 헬레실트</div>
+              <div class="srl-via">↓ 피오르 카페리 · 약 1시간</div>
+              <div class="srl-to">게이랑에르 <span class="place-arrow">↗</span></div>
+            </div>
+            <div class="sch-sub">세계 최고의 피오르 항로</div>
+            <div class="sch-tag t-move">이동</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot"></div></div>
+          <div class="sch-body sch-place-link" onclick="window.open('https://www.google.com/maps/place/Meretes+Garden+-+Yoga,+spa+%26+retreat/@62.313791,7.2886495,17z/data=!4m10!3m9!1s0x46141edb83b8de05:0xdf4a09504043a565!5m3!1s2026-08-15!4m1!1i2!8m2!3d62.3137885!4d7.2912244!16s%2Fg%2F11g7zd7tr1?entry=ttu&g_ep=EgoyMDI2MDYyOS4wIKXMDSoASAFQAw%3D%3D','_blank')">
+            <div class="sch-label">🏡 Meretes Garden <span class="place-arrow">↗</span></div>
+            <div class="sch-sub">게이랑에르</div>
+            <span class="breakfast-badge">🍳 조식포함</span>
+            <div class="sch-tag-row">
+              <div class="sch-tag t-hotel" style="margin-top:0">숙소</div>
+              <button class="price-btn" onclick="event.stopPropagation();togglePrice('si-5')" style="font-size:14px">💰</button>
+            </div>
+            <div class="sch-price-panel hidden" id="price-si-5" onclick="event.stopPropagation()">
+              <div class="price-amount">3,750 NOK <span style="font-size:11px;font-weight:400;color:#9fb0c8">(약 50만원)</span></div>
+              <span class="price-chip chip-paid">결제완료</span>
+            </div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 오늘 가볼 만한 곳</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">⛴️</div><div><div class="tip-name">게이랑에르 피오르 카페리</div><div class="tip-desc">헬레실트→게이랑에르 유네스코 세계유산 피오르 크루즈</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">💧</div><div><div class="tip-name">일곱자매 폭포 (De Syv Søstrene)</div><div class="tip-desc">카페리에서 감상 · 7줄기 직각 폭포, 세계 최고 절경</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🛣️</div><div><div class="tip-name">독수리 로드 (Ørnesvingen)</div><div class="tip-desc">게이랑에르 위 11개 헤어핀 전망대 · 피오르 조감</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏔️</div><div><div class="tip-name">달스니바 스카이워크 (Dalsnibba)</div><div class="tip-desc">해발 1500m · 노르웨이에서 가장 높이서 보는 피오르 전망</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">💧</div><div><div class="tip-name">신부의 베일 폭포 (Brudesløret)</div><div class="tip-desc">게이랑에르 피오르 남쪽 절벽 폭포, 카페리에서 감상</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="day-group" id="day-5">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-norway">
+          <div class="ddb-date">12</div>
+          <div class="ddb-dow">수</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">올레순</div>
+          <div class="day-sub-label">8월 12일</div>
+        </div>
+        <div class="day-flag">🇳🇴</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body">
+            <div class="sch-route-label">
+              <div class="srl-from">🚗 게이랑에르</div>
+              <div class="srl-via">↓ 트롤스티겐 경유</div>
+              <div class="srl-to">올레순</div>
+            </div>
+            <div class="sch-tag t-move">이동</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot"></div></div>
+          <div class="sch-body sch-place-link" onclick="window.open('https://www.airbnb.co.kr/rooms/26288918?check_in=2026-08-12&check_out=2026-08-13&guests=1&adults=4','_blank')">
+            <div class="sch-label">🏠 에어비앤비 체크인 <span class="place-arrow">↗</span></div>
+            <div class="sch-sub">올레순 숙소</div>
+            <div class="sch-tag-row">
+              <div class="sch-tag t-hotel" style="margin-top:0">숙소</div>
+              <button class="price-btn" onclick="event.stopPropagation();togglePrice('si-6')" style="font-size:14px">💰</button>
+            </div>
+            <div class="sch-price-panel hidden" id="price-si-6" onclick="event.stopPropagation()">
+              <div class="price-amount">417,376원</div>
+              <span class="price-chip chip-scheduled">8/3 결제예정</span>
+            </div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 오늘 가볼 만한 곳</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">⛰️</div><div><div class="tip-name">악슬라 전망대 (Aksla/Fjellstua)</div><div class="tip-desc">418계단 · 올레순 섬과 피오르 전체 파노라마</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏛️</div><div><div class="tip-name">유겐트스틸센터렛 (Jugendstilsenteret)</div><div class="tip-desc">아르누보 건축 전문 박물관 · 1904년 도시 재건 역사</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🐟</div><div><div class="tip-name">아틀란틱 해양공원 (Atlanterhavsparken)</div><div class="tip-desc">유럽 최대 해수 수족관 중 하나 · 시내에서 3km</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏰</div><div><div class="tip-name">순뫼레 박물관 (Sunnmøre Museum)</div><div class="tip-desc">선사시대 선박 포함 야외 역사박물관 · 피오르 옆 위치</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🌅</div><div><div class="tip-name">Brosundet 운하</div><div class="tip-desc">올레순 도심 운하 · 아르누보 건물과 저녁 노을 명소</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="day-group" id="day-6">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-norway">
+          <div class="ddb-date">13</div>
+          <div class="ddb-dow">목</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">올레순 → 베르겐 방향</div>
+          <div class="day-sub-label">8월 13일</div>
+        </div>
+        <div class="day-flag">🇳🇴</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body">
+            <div class="sch-route-label">
+              <div class="srl-from">🚗 올레순</div>
+              <div class="srl-via">↓ 해안도로 드라이브</div>
+              <div class="srl-to">베르겐 방향</div>
+            </div>
+            <div class="sch-tag t-move">이동</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot"></div></div>
+          <div class="sch-body sch-place-link" onclick="window.open('https://www.google.com/maps/place/%ED%86%A4+%ED%98%B8%ED%85%94+%EC%9D%B4%EC%9A%80%EC%8A%A4%ED%85%8C%EB%A5%B4/@61.571961,6.4787573,17z','_blank')">
+            <div class="sch-label">🏨 톤 호텔 이욀스테르 <span class="place-arrow">↗</span></div>
+            <div class="sch-tag-row">
+              <div class="sch-tag t-hotel" style="margin-top:0">숙소</div>
+              <button class="price-btn" onclick="event.stopPropagation();togglePrice('si-7')" style="font-size:14px">💰</button>
+            </div>
+            <div class="sch-price-panel hidden" id="price-si-7" onclick="event.stopPropagation()">
+              <div class="price-amount">738,286원</div>
+              <span class="price-chip chip-paid">결제완료</span>
+              <span class="price-chip chip-norefund">환불불가</span>
+              <div class="price-note">jarbest333@gmail.com 계정으로 예약</div>
+            </div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 오늘 가볼 만한 곳</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">🛣️</div><div><div class="tip-name">트롤스티엔 (Trollstigen)</div><div class="tip-desc">11개 헤어핀 커브 산악도로 · 노르웨이 국가 관광루트</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏔️</div><div><div class="tip-name">트롤스티엔 방문자 센터</div><div class="tip-desc">폭포 바로 옆 절벽 위 전망 데크 · 무료 입장</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏔️</div><div><div class="tip-name">롬스달렌 계곡 (Romsdalen)</div><div class="tip-desc">트롤틴다 산군과 로름달스호른 전망 · 절경 드라이브</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">⛵</div><div><div class="tip-name">히외룬피오르 (Hjørundfjord)</div><div class="tip-desc">이욀스테르 근처, 알프스 같은 절벽이 피오르를 둘러싼 비경</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏘️</div><div><div class="tip-name">안달스네스 (Åndalsnes)</div><div class="tip-desc">롬스달피오르 끝 소도시 · 트롤스티엔 기점, 항구 산책</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="day-group" id="day-7">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-norway">
+          <div class="ddb-date">14</div>
+          <div class="ddb-dow">금</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">베르겐 귀환</div>
+          <div class="day-sub-label">8월 14일</div>
+        </div>
+        <div class="day-flag">🇳🇴</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body">
+            <div class="sch-route-label">
+              <div class="srl-from">🚗 이욀스테르</div>
+              <div class="srl-via">↓ 렌트카 반납 준비</div>
+              <div class="srl-to">베르겐</div>
+            </div>
+            <div class="sch-tag t-move">이동</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot"></div></div>
+          <div class="sch-body sch-place-link" onclick="window.open('https://www.google.com/maps/place/%EC%98%AC%EB%A0%88+%EB%B6%88+%ED%98%B8%ED%85%94+%EC%95%A4%EB%93%9C+%EC%95%84%ED%8C%8C%ED%8A%B8/@60.3923278,5.3195538,17z','_blank')">
+            <div class="sch-label">🏨 올레 불 호텔 앤 아파트먼트 <span class="place-arrow">↗</span></div>
+            <div class="sch-sub">베르겐</div>
+            <div class="sch-tag-row">
+              <div class="sch-tag t-hotel" style="margin-top:0">숙소</div>
+              <button class="price-btn" onclick="event.stopPropagation();togglePrice('si-8')" style="font-size:14px">💰</button>
+            </div>
+            <div class="sch-price-panel hidden" id="price-si-8" onclick="event.stopPropagation()">
+              <div class="price-amount">506,971원</div>
+              <span class="price-chip chip-paid">결제완료</span>
+              <span class="price-chip chip-norefund">환불불가</span>
+              <div class="price-note">미로그인 예약 · 이메일로 확정서 수령</div>
+            </div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 오늘 가볼 만한 곳</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">⛪</div><div><div class="tip-name">우르네스 목조교회 (Urnes Stave Church)</div><div class="tip-desc">유네스코 세계유산 · 노르웨이 현존 최고(最古) 목조교회</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏔️</div><div><div class="tip-name">스테가스테인 전망대 (Stegastein)</div><div class="tip-desc">아우를란 위 650m 절벽 돌출 전망 데크 · 소그네피오르 조망</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🚢</div><div><div class="tip-name">소그네피오르 카페리 (Sognefjord)</div><div class="tip-desc">노르웨이 최장 피오르 횡단 · 이동 중 카페리 탑승</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏘️</div><div><div class="tip-name">보스 마을 (Voss)</div><div class="tip-desc">베르겐 직전 마을 · 반누 호수와 보스 곤돌 케이블카</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏰</div><div><div class="tip-name">베르겐 요새 (Bergenhus Fortress)</div><div class="tip-desc">베르겐 도착 후 · 13세기 요새, 로젠크란츠 탑 포함</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="day-group" id="day-8">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-denmark">
+          <div class="ddb-date">15</div>
+          <div class="ddb-dow">토</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">베르겐 → 코펜하겐 ✈️</div>
+          <div class="day-sub-label">8월 15일</div>
+        </div>
+        <div class="day-flag">🇩🇰</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body">
+            <div class="sch-label">🚗 렌트카 반납</div>
+            <div class="sch-sub">베르겐 공항 렌터카 센터</div>
+            <div class="sch-tag t-move">이동</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time">14:40</div>
+          <div class="sch-spine"><div class="spine-dot hi"></div><div class="spine-line"></div></div>
+          <div class="sch-body">
+            <div class="sch-route-label">
+              <div class="srl-from">✈️ BGO 베르겐</div>
+              <div class="srl-via">↓ SK2875 · A320NEO · 1시간 20분</div>
+              <div class="srl-to">CPH 코펜하겐 <span style="font-size:10px;color:#9fb0c8">16:00 도착</span></div>
+            </div>
+            <div class="sch-ref">DG223P · Kastrup Terminal 3</div>
+            <div class="sch-tag t-depart">출발</div>
+          </div>
+        </div>
+        <div class="sch-item">
+          <div class="sch-time"></div>
+          <div class="sch-spine"><div class="spine-dot"></div></div>
+          <div class="sch-body sch-place-link" onclick="window.open('https://www.google.co.kr/maps/place/Europahuset+-+Danhostel+Copenhagen+City+Hotel+Apartments/@55.6763771,12.561353,14.02z','_blank')">
+            <div class="sch-label">🏠 Europahuset Apartments <span class="place-arrow">↗</span></div>
+            <div class="sch-sub">코펜하겐 시내</div>
+            <div class="sch-tag-row">
+              <div class="sch-tag t-hotel" style="margin-top:0">숙소</div>
+              <button class="price-btn" onclick="event.stopPropagation();togglePrice('si-9')" style="font-size:14px">💰</button>
+            </div>
+            <div class="sch-price-panel hidden" id="price-si-9" onclick="event.stopPropagation()">
+              <div class="price-amount">680,621원</div>
+              <span class="price-chip chip-unpaid">미결제</span>
+              <span class="price-chip chip-norefund">환불불가</span>
+              <div class="price-note">부킹닷컴 확인중</div>
+            </div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 오늘 가볼 만한 곳</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">🌈</div><div><div class="tip-name">뉘하운 (Nyhavn)</div><div class="tip-desc">17세기 운하와 형형색색 건물 · 코펜하겐 상징 포토스팟</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🏰</div><div><div class="tip-name">크리스티안스보르 궁전 탑</div><div class="tip-desc">탑 전망대 무료 개방 · 코펜하겐 최고 조망</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🌹</div><div><div class="tip-name">로젠보르 성 (Rosenborg Castle)</div><div class="tip-desc">17세기 르네상스 성 · 왕실 보물 및 왕관 전시</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🛍️</div><div><div class="tip-name">스트뢰이에 (Strøget)</div><div class="tip-desc">유럽 최장 보행자 쇼핑 거리 1.1km · 레고·아르마니 등</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🧜</div><div><div class="tip-name">인어공주 상 (The Little Mermaid)</div><div class="tip-desc">코펜하겐 항구 산책로 조각상</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="day-group" id="day-9">
+      <div class="day-header" onclick="toggleDay(this)">
+        <div class="day-date-badge dnb-denmark">
+          <div class="ddb-date">16</div>
+          <div class="ddb-dow">일</div>
+        </div>
+        <div class="day-info">
+          <div class="day-place">코펜하겐 · 귀국 ✈️</div>
+          <div class="day-sub-label">8월 16일</div>
+        </div>
+        <div class="day-flag">🇩🇰</div>
+        <div class="chevron">▼</div>
+      </div>
+      <div class="day-body hidden">
+        <div class="sch-item">
+          <div class="sch-time">23:55</div>
+          <div class="sch-spine"><div class="spine-dot hi-or"></div></div>
+          <div class="sch-body">
+            <div class="sch-route-label">
+              <div class="srl-from">✈️ CPH 코펜하겐</div>
+              <div class="srl-via">↓ SK0987 · A350-900 · 11시간 40분</div>
+              <div class="srl-to">ICN 인천 <span style="font-size:10px;color:#9fb0c8">8/17 18:35 도착</span></div>
+            </div>
+            <div class="sch-ref">DG223P · Terminal 3</div>
+            <div class="sch-tag t-depart">귀국</div>
+          </div>
+        </div>
+        <div class="day-tips">
+          <div class="day-tips-header" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.tips-chevron').classList.toggle('open')">
+            <span class="day-tips-title">📍 출발 전 잠깐</span>
+            <span class="tips-chevron">▼</span>
+          </div>
+          <div class="day-tips-body hidden">
+            <div class="tip-item"><div class="tip-emoji">🌈</div><div><div class="tip-name">뉘하운 이른 아침 (Nyhavn)</div><div class="tip-desc">관광객 없는 조용한 아침 운하 풍경 · 오전 7시 전 추천</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🎡</div><div><div class="tip-name">티볼리 공원 (Tivoli Gardens)</div><div class="tip-desc">1843년 개장, 세계 두 번째로 오래된 놀이공원</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🛍️</div><div><div class="tip-name">스트뢰이에 (Strøget)</div><div class="tip-desc">기념품 쇼핑 마지막 찬스 · 오전 10시 오픈</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">🍺</div><div><div class="tip-name">칼스버그 방문자 센터 (Carlsberg)</div><div class="tip-desc">덴마크 국민 맥주 공장 투어 · 시음 포함</div></div></div>
+            <div class="tip-item"><div class="tip-emoji">✈️</div><div><div class="tip-name">CPH 공항 면세점</div><div class="tip-desc">출발 3시간 전 도착 권장 · 덴마크 특산품 면세 구매 가능</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+</div><!-- /itinerary -->
+
+
+  <!-- ════ 교통 ════ -->
+  <div class="panel" id="panel-transport">
+    <div class="sec-title">✈️ 항공편 · 예약번호 <span style="color:#3a7bd5;font-size:12px;font-weight:800;">DG223P</span></div>
+
+    <div class="flight-card">
+      <div class="fl-header"><div class="fl-num">SK 0988</div><div class="fl-booking">Scandinavian Airlines · <strong>DG223P</strong></div></div>
+      <div class="fl-body">
+        <div class="fl-route">
+          <div class="fl-ap"><div class="fl-code">ICN</div><div class="fl-city">서울 인천</div><div class="fl-time">23:35</div><div class="fl-date">8/7(금)</div></div>
+          <div class="fl-mid"><div class="fl-dur">13시간 25분</div><div class="fl-bar"><div class="fl-bar-line"></div><span style="font-size:14px">✈️</span><div class="fl-bar-line"></div></div></div>
+          <div class="fl-ap" style="text-align:right"><div class="fl-code">CPH</div><div class="fl-city">코펜하겐</div><div class="fl-time">06:00</div><div class="fl-date">8/8(토)</div></div>
+        </div>
+        <div class="fl-chips"><div class="fl-chip">✈️ A350-900</div><div class="fl-chip">T2 → T3</div></div>
+      </div>
+    </div>
+
+    <div class="flight-card">
+      <div class="fl-header"><div class="fl-num">SK 2862</div><div class="fl-booking">Scandinavian Airlines · <strong>DG223P</strong></div></div>
+      <div class="fl-body">
+        <div class="fl-route">
+          <div class="fl-ap"><div class="fl-code">CPH</div><div class="fl-city">코펜하겐</div><div class="fl-time">08:15</div><div class="fl-date">8/8(토)</div></div>
+          <div class="fl-mid"><div class="fl-dur">1시간 25분</div><div class="fl-bar"><div class="fl-bar-line"></div><span style="font-size:14px">✈️</span><div class="fl-bar-line"></div></div></div>
+          <div class="fl-ap" style="text-align:right"><div class="fl-code">BGO</div><div class="fl-city">베르겐</div><div class="fl-time">09:40</div><div class="fl-date">8/8(토)</div></div>
+        </div>
+        <div class="fl-chips"><div class="fl-chip">✈️ A319</div></div>
+      </div>
+    </div>
+
+    <div class="flight-card">
+      <div class="fl-header"><div class="fl-num">SK 2875</div><div class="fl-booking">Scandinavian Airlines · <strong>DG223P</strong></div></div>
+      <div class="fl-body">
+        <div class="fl-route">
+          <div class="fl-ap"><div class="fl-code">BGO</div><div class="fl-city">베르겐</div><div class="fl-time">14:40</div><div class="fl-date">8/15(토)</div></div>
+          <div class="fl-mid"><div class="fl-dur">1시간 20분</div><div class="fl-bar"><div class="fl-bar-line"></div><span style="font-size:14px">✈️</span><div class="fl-bar-line"></div></div></div>
+          <div class="fl-ap" style="text-align:right"><div class="fl-code">CPH</div><div class="fl-city">코펜하겐</div><div class="fl-time">16:00</div><div class="fl-date">8/15(토)</div></div>
+        </div>
+        <div class="fl-chips"><div class="fl-chip">✈️ A320neo</div></div>
+      </div>
+    </div>
+
+    <div class="flight-card">
+      <div class="fl-header"><div class="fl-num">SK 0987</div><div class="fl-booking">Scandinavian Airlines · <strong>DG223P</strong></div></div>
+      <div class="fl-body">
+        <div class="fl-route">
+          <div class="fl-ap"><div class="fl-code">CPH</div><div class="fl-city">코펜하겐</div><div class="fl-time">23:55</div><div class="fl-date">8/16(일)</div></div>
+          <div class="fl-mid"><div class="fl-dur">11시간 40분</div><div class="fl-bar"><div class="fl-bar-line"></div><span style="font-size:14px">✈️</span><div class="fl-bar-line"></div></div></div>
+          <div class="fl-ap" style="text-align:right"><div class="fl-code">ICN</div><div class="fl-city">서울 인천</div><div class="fl-time">18:35</div><div class="fl-date">8/17(월)</div></div>
+        </div>
+        <div class="fl-chips"><div class="fl-chip">✈️ A350-900</div><div class="fl-chip">T3 → T2 (인천)</div></div>
+      </div>
+    </div>
+
+    <div class="sec-title">🚗 렌트카</div>
+    <div class="car-card">
+      <div class="car-title">🚗 노르웨이 렌트카</div>
+      <div class="car-sub">베르겐 공항 픽업 → 베르겐 공항 반납</div>
+      <div class="car-rows">
+        <div class="car-row">📅 픽업 <span>8/8 (토) 오전 11:00</span></div>
+        <div class="car-row">📅 반납 <span>8/15 (토) 오전 11:00</span></div>
+        <div class="car-row">🚘 차종 <span>Toyota Yaris Cross 4x4 Aut.</span></div>
+        <div class="car-row">💰 요금 <span>14,971.55 NOK (후지불)</span></div>
+      </div>
+    </div>
+
+    <div class="memo-box">
+      <div class="memo-hd">💡 교통 팁</div>
+      <div class="memo-txt">· 노르웨이 도로 터널 유료 구간 자동결제 확인<br>· 헬레실트↔게이랑에르 페리 사전 예약 필수<br>· 코펜하겐 자전거 대여 추천 (Bycyklen 앱)</div>
+    </div>
+  </div><!-- /transport -->
+
+
+  <!-- ════ 장소 ════ -->
+  <div class="panel" id="panel-places">
+    <div class="map-section">
+      <div class="map-title-row"><div class="map-title">🗺️ 여행 루트 지도</div></div>
+      <div class="map-container"><div id="tripMap"></div></div>
+      <a class="map-open-btn" href="https://maps.app.goo.gl/PWbXh29reK59HAGb7" target="_blank"><span>📍</span> 내 저장 구글 지도 열기</a>
+    </div>
+
+    <div class="country-divider">
+      <div class="country-divider-line"></div>
+      <div class="country-badge badge-norway">🇳🇴 노르웨이 명소</div>
+      <div class="country-divider-line"></div>
+    </div>
+
+    <div class="place-card" id="place-geiranger">
+      <div class="place-emo">🏔️</div>
+      <div class="place-body"><div class="place-name">게이랑에르 피오르</div><div class="place-desc">유네스코 세계유산 · 일곱자매 폭포 · 신랑 폭포</div><div class="place-tag-row"><span class="ptag ptag-nature">자연</span><span class="ptag ptag-view">뷰포인트</span></div></div>
+      <div class="place-star">⭐</div>
+    </div>
+    <div class="place-card" id="place-njofjord">
+      <div class="place-emo">⛴️</div>
+      <div class="place-body"><div class="place-name">뇨르달스피오르</div><div class="place-desc">구드방겐~플롬 피오르 보트 · 유네스코 세계유산</div><div class="place-tag-row"><span class="ptag ptag-nature">자연</span><span class="ptag ptag-city">보트투어</span></div></div>
+      <div class="place-star">⭐</div>
+    </div>
+    <div class="place-card" id="place-loen">
+      <div class="place-emo">🚡</div>
+      <div class="place-body"><div class="place-name">로엔 스카이리프트</div><div class="place-desc">세계 최급경사 케이블카 · 로엔 피오르 전망</div><div class="place-tag-row"><span class="ptag ptag-view">전망대</span><span class="ptag ptag-nature">자연</span></div></div>
+      <div class="place-star">⭐</div>
+    </div>
+    <div class="place-card" id="place-flam">
+      <div class="place-emo">🚂</div>
+      <div class="place-body"><div class="place-name">플롬 산악열차</div><div class="place-desc">세계에서 가장 아름다운 기차 여행</div><div class="place-tag-row"><span class="ptag ptag-city">플롬</span><span class="ptag ptag-view">명물</span></div></div>
+      <div class="place-star">⭐</div>
+    </div>
+    <div class="place-card" id="place-trollstigen">
+      <div class="place-emo">🌀</div>
+      <div class="place-body"><div class="place-name">트롤스티겐</div><div class="place-desc">11개 헤어핀 커브 산악도로 · 노르웨이 국가관광루트</div><div class="place-tag-row"><span class="ptag ptag-view">드라이브</span><span class="ptag ptag-nature">자연</span></div></div>
+      <div class="place-star">⭐</div>
+    </div>
+    <div class="place-card" id="place-dalsnibba">
+      <div class="place-emo">🌅</div>
+      <div class="place-body"><div class="place-name">달스니바 전망대</div><div class="place-desc">게이랑에르 피오르 최고의 뷰포인트 · 해발 1,476m</div><div class="place-tag-row"><span class="ptag ptag-view">전망대</span><span class="ptag ptag-nature">자연</span></div></div>
+      <div class="place-star">⭐</div>
+    </div>
+    <div class="place-card" id="place-bryggen">
+      <div class="place-emo">🏘️</div>
+      <div class="place-body"><div class="place-name">브뤼겐 (Bryggen)</div><div class="place-desc">유네스코 세계유산 목조 건물군</div><div class="place-tag-row"><span class="ptag ptag-history">문화</span><span class="ptag ptag-city">베르겐</span></div></div>
+      <div class="place-star">📌</div>
+    </div>
+    <div class="place-card" id="place-alesund">
+      <div class="place-emo">🏙️</div>
+      <div class="place-body"><div class="place-name">올레순 · 악슬라 산 전망대</div><div class="place-desc">아르누보 도시 · 418계단 · 도시 전경</div><div class="place-tag-row"><span class="ptag ptag-view">전망대</span><span class="ptag ptag-city">올레순</span></div></div>
+      <div class="place-star">📌</div>
+    </div>
+    <div class="place-card" id="place-floyen">
+      <div class="place-emo">🚡</div>
+      <div class="place-body"><div class="place-name">플뢰이엔 케이블카</div><div class="place-desc">베르겐 전경 · 정상 하이킹 · 도심 접근 용이</div><div class="place-tag-row"><span class="ptag ptag-view">전망대</span><span class="ptag ptag-city">베르겐</span></div></div>
+      <div class="place-star">📌</div>
+    </div>
+
+    <div class="country-divider">
+      <div class="country-divider-line"></div>
+      <div class="country-badge badge-denmark">🇩🇰 코펜하겐 명소</div>
+      <div class="country-divider-line"></div>
+    </div>
+
+    <div class="place-card" id="place-nyhavn">
+      <div class="place-emo">🛶</div>
+      <div class="place-body"><div class="place-name">뉘하운 운하</div><div class="place-desc">형형색색 건물 · 카페 · 보트 투어</div><div class="place-tag-row"><span class="ptag ptag-city">명소</span><span class="ptag ptag-history">문화</span></div></div>
+      <div class="place-star">⭐</div>
+    </div>
+    <div class="place-card" id="place-mermaid">
+      <div class="place-emo">🧜</div>
+      <div class="place-body"><div class="place-name">인어공주 동상</div><div class="place-desc">코펜하겐 상징 · 항구 산책로</div><div class="place-tag-row"><span class="ptag ptag-city">랜드마크</span></div></div>
+      <div class="place-star">📌</div>
+    </div>
+    <div class="place-card" id="place-christiansborg">
+      <div class="place-emo">🏰</div>
+      <div class="place-body"><div class="place-name">크리스티안스보르 궁전</div><div class="place-desc">덴마크 의회 · 일부 무료 입장</div><div class="place-tag-row"><span class="ptag ptag-history">역사</span><span class="ptag ptag-city">코펜하겐</span></div></div>
+      <div class="place-star">📌</div>
+    </div>
+
+    <div class="memo-box" style="margin-top:12px;">
+      <div class="memo-hd">⭐ 범례</div>
+      <div class="memo-txt">⭐ 꼭 가야 할 곳 &nbsp;·&nbsp; 📌 가고 싶은 곳<br>일정 탭의 장소명 ↗ 클릭하면 여기로 연결돼요</div>
+    </div>
+  </div><!-- /places -->
+
+</div><!-- /content -->
+
+<!-- ── TAB BAR ── -->
+<nav class="tab-bar">
+  <button class="tab-btn active" id="tab-itinerary" onclick="switchTab('itinerary',this)"><span class="ti">🗓️</span><span>일정</span><div class="tab-dot"></div></button>
+
+  <button class="tab-btn" id="tab-transport" onclick="switchTab('transport',this)"><span class="ti">✈️</span><span>교통</span></button>
+</nav>
+
+<div class="tooltip-popup hidden" id="tooltipPopup">
+  <div class="tt-title" id="ttTitle"></div>
+  <div id="ttBody"></div>
+</div>
+
+<script>
+  const tooltipData = {
+    'icn-dep': { title:'✈️ 서울 인천 출발', rows:['<strong>SK0988</strong> · Scandinavian Airlines','8/7(금) <strong>23:35</strong> 출발','Terminal 2 · A350-900','예약번호: <strong>DG223P</strong>'] },
+    'cph-via': { title:'🔄 코펜하겐 경유', rows:['도착 8/8(토) <strong>06:00</strong> (SK0988)','출발 8/8(토) <strong>08:15</strong> (SK2862)','Terminal 3 · 대기 2h15m'] },
+    'bgo':     { title:'🏔️ 베르겐', rows:['도착 8/8(토) <strong>09:40</strong>','노르웨이 렌트카 여행 <strong>7박</strong>','─────','출발 8/15(토) <strong>14:40</strong> (SK2875)'] },
+    'cph-ret': { title:'🔄 코펜하겐 귀환', rows:['도착 8/15(토) <strong>16:00</strong>','출발 8/16(일) <strong>23:55</strong> (SK0987)','→ 인천 <strong>11시간 40분</strong>'] },
+    'icn-arr': { title:'🛬 서울 인천 도착', rows:['<strong>SK0987</strong> · Scandinavian Airlines','8/17(월) <strong>18:35</strong> 도착','Terminal 2 · A350-900'] }
+  };
+
+  let tooltipVisible = false;
+  function showTooltip(e, key) {
+    e.stopPropagation();
+    const data = tooltipData[key]; if (!data) return;
+    const tt = document.getElementById('tooltipPopup');
+    document.getElementById('ttTitle').textContent = data.title;
+    document.getElementById('ttBody').innerHTML = data.rows.map(r => r==='─────'
+      ? '<div style="height:1px;background:rgba(255,255,255,.15);margin:5px 0"></div>'
+      : `<div class="tt-row">${r}</div>`).join('');
+    const W=190, rect=e.currentTarget.getBoundingClientRect(), bodyW=Math.min(430,window.innerWidth), bodyLeft=(window.innerWidth-bodyW)/2;
+    let left=rect.left+rect.width/2-W/2;
+    left=Math.max(bodyLeft+8,Math.min(left,bodyLeft+bodyW-W-8));
+    tt.style.left=left+'px'; tt.style.top=(rect.bottom+8)+'px'; tt.style.minWidth=W+'px';
+    tt.classList.remove('hidden'); tooltipVisible=true;
+  }
+  document.addEventListener('click',()=>{ if(tooltipVisible){document.getElementById('tooltipPopup').classList.add('hidden');tooltipVisible=false;} });
+
+  function togglePrice(id) { const p=document.getElementById('price-'+id); if(p) p.classList.toggle('hidden'); }
+  function toggleCarInfo() { const p=document.getElementById('car-info'); if(p) p.classList.toggle('hidden'); }
+
+  /* ── 오늘 날짜 자동 열기 ── */
+  function autoOpenToday() {
+    const now = new Date();
+    const m = now.getMonth() + 1, d = now.getDate();
+    const map = {
+      '8-7':0, '8-8':1, '8-9':2, '8-10':3,
+      '8-11':4, '8-12':5, '8-13':6, '8-14':7, '8-15':8, '8-16':9
+    };
+    const dayNum = map[`${m}-${d}`];
+    if (dayNum === undefined) return; // 여행 날짜 아니면 패스
+    // 전체 닫기
+    document.querySelectorAll('.day-header').forEach(h => {
+      h.classList.remove('open');
+      h.nextElementSibling.classList.add('hidden');
+    });
+    // 오늘 날짜 열기
+    const el = document.getElementById('day-' + dayNum);
+    if (!el) return;
+    el.querySelector('.day-header').classList.add('open');
+    el.querySelector('.day-body').classList.remove('hidden');
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
+  }
+  window.addEventListener('DOMContentLoaded', autoOpenToday);
+
+  function switchTab(name,btn) {
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-'+name).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(b=>{ b.classList.remove('active'); const d=b.querySelector('.tab-dot'); if(d) d.remove(); });
+    btn.classList.add('active');
+    const dot=document.createElement('div'); dot.className='tab-dot'; btn.appendChild(dot);
+    window.scrollTo({top:0,behavior:'smooth'});
+    if(name==='places') setTimeout(buildMap,100);
+  }
+
+  function toggleDay(header) {
+    const body=header.nextElementSibling, isOpen=header.classList.contains('open');
+    header.classList.toggle('open',!isOpen); body.classList.toggle('hidden',isOpen);
+  }
+
+  function scrollToDay(n) {
+    const tabBtn=document.getElementById('tab-itinerary'); switchTab('itinerary',tabBtn);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const el=document.getElementById('day-'+n); if(!el) return;
+      const hdr=el.querySelector('.day-header'), body=el.querySelector('.day-body');
+      if(!hdr.classList.contains('open')){ hdr.classList.add('open'); body.classList.remove('hidden'); }
+      el.scrollIntoView({behavior:'smooth',block:'start'});
+      setTimeout(()=>{ hdr.classList.add('flash'); setTimeout(()=>hdr.classList.remove('flash'),1000); },400);
+    }));
+  }
+
+  function goToStay(id) {
+    switchTab('stay',document.getElementById('tab-stay'));
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const el=document.getElementById(id); if(!el) return;
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      setTimeout(()=>{ el.classList.add('highlighted'); setTimeout(()=>el.classList.remove('highlighted'),1800); },300);
+    }));
+  }
+
+  function goToPlace(id) {
+    switchTab('places',document.getElementById('tab-places'));
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const el=document.getElementById(id); if(!el) return;
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      setTimeout(()=>{ el.classList.add('highlighted'); setTimeout(()=>el.classList.remove('highlighted'),1800); },300);
+    }));
+  }
+
+  /* ── Map ── */
+  let _mapInited=false, _leafletReady=false;
+  const waypoints=[
+    {latlng:[60.3913,5.3221],  day:'8/8',  name:'베르겐',      color:'#3a7bd5'},
+    {latlng:[60.8775,6.8313],  day:'8/9',  name:'구드방겐',    color:'#3a7bd5'},
+    {latlng:[60.8632,7.1186],  day:'8/9',  name:'플롬',        color:'#3a7bd5'},
+    {latlng:[61.0990,7.4764],  day:'8/10', name:'뢰르달',      color:'#3a7bd5'},
+    {latlng:[61.8777,6.8500],  day:'8/10', name:'로엔',        color:'#3a7bd5'},
+    {latlng:[62.0888,6.8859],  day:'8/11', name:'헬레실트',    color:'#3a7bd5'},
+    {latlng:[62.1024,7.2052],  day:'8/11', name:'게이랑에르',  color:'#3a7bd5'},
+    {latlng:[62.4682,7.6591],  day:'8/12', name:'트롤스티겐',  color:'#3a7bd5'},
+    {latlng:[62.4722,6.1495],  day:'8/12', name:'올레순',      color:'#3a7bd5'},
+    {latlng:[60.3913,5.3221],  day:'8/14', name:'베르겐 귀환', color:'#3a7bd5'},
+    {latlng:[55.6761,12.5683], day:'8/15', name:'코펜하겐',    color:'#f5a623'},
+  ];
+
+  function addArrows(map,pts,color){
+    for(let i=0;i<pts.length-1;i++){
+      const a=pts[i],b=pts[i+1];
+      const angle=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
+      const html=`<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:11px solid ${color};transform:rotate(${angle}deg);opacity:0.85"></div>`;
+      L.marker([(a[0]+b[0])/2,(a[1]+b[1])/2],{icon:L.divIcon({html,className:'',iconSize:[10,11],iconAnchor:[5,5]})}).addTo(map);
+    }
+  }
+
+  function buildMap(){
+    if(_mapInited){window._tripMapInstance&&window._tripMapInstance.invalidateSize();return;}
+    if(!_leafletReady||typeof L==='undefined'){setTimeout(buildMap,150);return;}
+    _mapInited=true;
+    const map=L.map('tripMap',{zoomControl:true,attributionControl:false,minZoom:5}).setView([61.2,7.0],6);
+    window._tripMapInstance=map;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
+    const nPts=waypoints.slice(0,10).map(w=>w.latlng);
+    L.polyline(nPts,{color:'#3a7bd5',weight:3,opacity:0.75,dashArray:'8,5'}).addTo(map);
+    addArrows(map,nPts,'#3a7bd5');
+    const cPts=[[60.3913,5.3221],[55.6761,12.5683]];
+    L.polyline(cPts,{color:'#f5a623',weight:2.5,opacity:0.7,dashArray:'7,5'}).addTo(map);
+    addArrows(map,cPts,'#f5a623');
+    waypoints.forEach(wp=>{
+      const dot=`<div style="width:11px;height:11px;border-radius:50%;background:${wp.color};border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);margin:0 auto"></div>`;
+      const label=`<div style="background:rgba(20,20,40,0.82);color:#fff;border-radius:5px;padding:2px 6px;font-size:9px;font-weight:700;white-space:nowrap;line-height:1.35;text-align:center;margin-top:2px">${wp.day}<br>${wp.name}</div>`;
+      L.marker(wp.latlng,{icon:L.divIcon({html:`<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none">${dot}${label}</div>`,className:'',iconSize:[70,42],iconAnchor:[35,8]})}).addTo(map);
+    });
+    setTimeout(()=>map.invalidateSize(),200);
+  }
+
+  (function loadLeaflet(){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    s.onload=()=>{_leafletReady=true;};
+    s.onerror=()=>{const s2=document.createElement('script');s2.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';s2.onload=()=>{_leafletReady=true;};document.head.appendChild(s2);};
+    document.head.appendChild(s);
+  })();
+</script>
+</body>
+</html>
