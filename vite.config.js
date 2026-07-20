@@ -16,8 +16,8 @@ export default defineConfig({
         background_color: '#f8fafc',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: '/household-finance/',
+        start_url: '/household-finance/',
         icons: [
           {
             src: 'pwa-192.png',
@@ -55,5 +55,5 @@ export default defineConfig({
       }
     })
   ],
-  base: '/',
+  base: '/household-finance/',
 })
