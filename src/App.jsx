@@ -228,7 +228,6 @@ export default function App() {
   const [assets, setAssets] = useState([]);
   const [assetItems, setAssetItems] = useState([]); // asset_items: { name, grp: savings|invest|debt, hidden }
   const [showHidden, setShowHidden] = useState(false);
-  const [trendMode, setTrendMode] = useState("total"); // 자산 추이: total | net
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState("home");
   const [homePeriod, setHomePeriod] = useState("month"); // 홈 도넛 기간: month | year
@@ -370,21 +369,15 @@ export default function App() {
     return "savings";
   }, [assetItems]);
 
-  // mAst = 자산(부채 제외), mDebt = 부채
+  // mAst = 이번 달 자산
   const mAst = useMemo(
     () => assets.filter((a) => a.month === month && groupOf(a.name) !== "debt").sort((a, b) => b.amount - a.amount),
-    [assets, month, groupOf]
-  );
-  const mDebt = useMemo(
-    () => assets.filter((a) => a.month === month && groupOf(a.name) === "debt").sort((a, b) => b.amount - a.amount),
     [assets, month, groupOf]
   );
 
   const totExp = mExp.reduce((s, e) => s + e.amount, 0);
   const totInc = mInc.reduce((s, e) => s + e.amount, 0);
   const totAst = mAst.reduce((s, a) => s + a.amount, 0);
-  const totDebt = mDebt.reduce((s, a) => s + a.amount, 0);
-  const netWorth = totAst - totDebt;
   const balance = totInc - totExp;
 
   // Asset groups
@@ -511,17 +504,6 @@ export default function App() {
         return { name, amount: entry ? entry.amount : 0, hasData: !!entry, prevAmt: prev ? prev.amount : 0 };
       });
   }, [assetTemplate, mAst, assets, prevMonth, groupOf]);
-
-  const currentDebt = useMemo(() => {
-    const prevItems = prevMonth ? assets.filter((a) => a.month === prevMonth) : [];
-    return assetTemplate
-      .filter((name) => groupOf(name) === "debt")
-      .map((name) => {
-        const entry = mDebt.find((a) => a.name === name);
-        const prev = prevItems.find((a) => a.name === name);
-        return { name, amount: entry ? entry.amount : 0, hasData: !!entry, prevAmt: prev ? prev.amount : 0 };
-      });
-  }, [assetTemplate, mDebt, assets, prevMonth, groupOf]);
 
   const currentInvest = useMemo(() => {
     const yr = month.match(/^(\d+)\./)?.[1];
@@ -958,18 +940,6 @@ export default function App() {
                   <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{wonShort(a.amount)}</span>
                 </div>
               ))}
-              {totDebt > 0 && (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>부채</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#e11d48" }}>-{wonShort(totDebt)}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>순자산</span>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>{wonShort(netWorth)}</span>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1101,27 +1071,6 @@ export default function App() {
                 ) : null;
               })()}
             </div>
-            {totDebt > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8" }}>부채</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#e11d48", marginTop: 2 }}>-{wonShort(totDebt)}</div>
-                  {prevAst && prevAst.debt > 0 && totDebt > 0 && totDebt < prevAst.debt && (
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#059669", marginTop: 1 }}>전월보다 {wonShort(prevAst.debt - totDebt)} 줄었어요</div>
-                  )}
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8" }}>순자산</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: netWorth >= 0 ? "#0f172a" : "#e11d48", marginTop: 2 }}>{wonShort(netWorth)}</div>
-                  {prevAst && prevAst.debt > 0 && totAst > 0 && (() => {
-                    const d = netWorth - prevAst.net;
-                    return d !== 0 ? (
-                      <div style={{ fontSize: 10, fontWeight: 700, color: d > 0 ? "#059669" : "#dc2626", marginTop: 1 }}>전월 {d > 0 ? "+" : "-"}{wonShort(Math.abs(d))}</div>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Asset Trend Chart */}
@@ -1129,22 +1078,10 @@ export default function App() {
             <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>자산 추이 {month.match(/^(\d+)\./)?.[1]}년</span>
-                {assetTrend.some((d) => d.debt > 0) && (
-                  <span style={{ display: "flex", background: "#f1f5f9", borderRadius: 6, padding: 2 }}>
-                    {[{ id: "total", l: "총자산" }, { id: "net", l: "순자산" }].map((o) => (
-                      <button key={o.id} onClick={() => setTrendMode(o.id)} style={{
-                        padding: "3px 9px", borderRadius: 5, border: "none", cursor: "pointer", fontSize: 10, fontWeight: 700,
-                        background: trendMode === o.id ? "#fff" : "transparent", color: trendMode === o.id ? "#0f172a" : "#94a3b8",
-                      }}>{o.l}</button>
-                    ))}
-                  </span>
-                )}
               </div>
               {(() => {
-                const hasDebt = assetTrend.some((d) => d.debt > 0);
-                const valOf = (d) => (hasDebt && trendMode === "net" ? d.net : d.total);
-                const maxVal = Math.max(...assetTrend.map(valOf));
-                const minVal = Math.min(...assetTrend.map(valOf));
+                const maxVal = Math.max(...assetTrend.map((d) => d.total));
+                const minVal = Math.min(...assetTrend.map((d) => d.total));
                 const range = maxVal - minVal || 1;
                 const padTop = 28;
                 const padBot = 18;
@@ -1156,8 +1093,8 @@ export default function App() {
                 const usableW = W - padL - padR;
                 const pts = assetTrend.map((d, i) => {
                   const x = padL + (assetTrend.length === 1 ? usableW / 2 : (i / (assetTrend.length - 1)) * usableW);
-                  const y = padTop + bodyH - ((valOf(d) - minVal) / range) * bodyH;
-                  return { x, y, ...d, total: valOf(d) };
+                  const y = padTop + bodyH - ((d.total - minVal) / range) * bodyH;
+                  return { x, y, ...d };
                 });
                 const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
                 const areaPath = linePath + ` L ${pts[pts.length - 1].x} ${padTop + bodyH} L ${pts[0].x} ${padTop + bodyH} Z`;
@@ -1588,72 +1525,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* ── 부채 Section ── */}
-              <div style={card}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: currentDebt.length ? 10 : 4 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#e11d48" }}>부채</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: totDebt > 0 ? "#e11d48" : "#0f172a" }}>{totDebt > 0 ? "-" + wonShort(totDebt) : "-"}</span>
-                </div>
-                {currentDebt.length === 0 && (
-                  <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.5 }}>대출 잔액을 추가하면 순자산과 상환 추이를 볼 수 있어요</div>
-                )}
-                {currentDebt.map((a, i) => {
-                  const open = editingItem === "d-" + a.name;
-                  const diff = a.amount > 0 && a.prevAmt > 0 ? a.amount - a.prevAmt : 0;
-                  return (
-                    <div key={a.name} style={{ padding: "8px 0", borderBottom: i < currentDebt.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div onClick={() => setEditingItem(open ? null : "d-" + a.name)} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", flex: 1 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: 3, background: "#e11d48" }} />
-                          <span style={{ fontSize: 12, fontWeight: 500, color: "#475569" }}>{a.name}</span>
-                        </div>
-                        {editingAsset === "d-" + a.name ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <input
-                              type="text" inputMode="numeric" autoFocus
-                              value={assetDraft ? parseInt(assetDraft.replace(/[^0-9]/g, "") || "0").toLocaleString() : ""}
-                              onChange={(e) => setAssetDraft(e.target.value.replace(/[^0-9]/g, ""))}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") { e.preventDefault();
-                                  const v = parseInt((assetDraft || "0").replace(/[^0-9]/g, ""));
-                                  if (v > 0) updateAssetAmount(a.name, month, v);
-                                  setEditingAsset(null);
-                                }
-                              }}
-                              style={{ width: 100, padding: "3px 6px", borderRadius: 5, border: "1.5px solid #fda4af", fontSize: 12, fontWeight: 700, textAlign: "right", outline: "none" }}
-                            />
-                            <button onClick={() => { const v = parseInt((assetDraft || "0").replace(/[^0-9]/g, "")); if (v > 0) updateAssetAmount(a.name, month, v); setEditingAsset(null); }} style={{ padding: "3px 7px", borderRadius: 5, border: "none", background: "#e11d48", color: "#fff", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>확인</button>
-                          </div>
-                        ) : (
-                          <div onClick={() => { setEditingAsset("d-" + a.name); setAssetDraft(a.amount > 0 ? String(a.amount) : ""); }} style={{ cursor: "pointer", textAlign: "right" }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: a.amount > 0 ? "#0f172a" : "#cbd5e1" }}>{a.amount > 0 ? wonShort(a.amount) : "미입력"}</div>
-                            {diff !== 0 && (
-                              <div style={{ fontSize: 9, fontWeight: 700, color: diff < 0 ? "#059669" : "#dc2626" }}>
-                                {diff < 0 ? "▼ " + wonShort(-diff) + " 상환" : "▲ " + wonShort(diff) + " 증가"}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {a.prevAmt > 0 && !open && (
-                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, marginLeft: 12 }}>
-                          <span style={{ fontSize: 10, color: "#94a3b8" }}>{prevMonth}</span>
-                          <span style={{ fontSize: 10, color: "#94a3b8" }}>{wonShort(a.prevAmt)}</span>
-                        </div>
-                      )}
-                      {open && (
-                        <div style={{ marginTop: 6, marginLeft: 12 }}>
-                          <button onClick={() => setItemHidden(a.name, true)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                            목록에서 숨기기 (상환 완료 등)
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                <AddItemRow color="#e11d48" placeholder="예: 주택담보대출" onAdd={(n) => addAssetItem(n, "debt")} />
-              </div>
-
               {/* ── 숨긴 항목 ── */}
               {hiddenItems.length > 0 && (
                 <div style={{ textAlign: "center", marginBottom: 12 }}>
@@ -1665,7 +1536,7 @@ export default function App() {
                       {hiddenItems.map((it) => (
                         <div key={it.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0" }}>
                           <span style={{ fontSize: 12, color: "#64748b" }}>
-                            {it.name} <span style={{ fontSize: 10, color: "#cbd5e1" }}>{it.grp === "debt" ? "부채" : it.grp === "invest" ? "투자" : "예적금"}</span>
+                            {it.name} <span style={{ fontSize: 10, color: "#cbd5e1" }}>{it.grp === "invest" ? "투자" : "예적금"}</span>
                           </span>
                           <button onClick={() => setItemHidden(it.name, false)} style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#fff", color: "#475569", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>다시 표시</button>
                         </div>
