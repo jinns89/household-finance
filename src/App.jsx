@@ -395,8 +395,9 @@ export default function App() {
 
   // Previous month comparison
   const prevMonth = useMemo(() => {
-    const idx = allMonths.indexOf(month);
-    return idx > 0 ? allMonths[idx - 1] : null;
+    const cur = parseMonthKey(month);
+    const before = allMonths.filter((m) => parseMonthKey(m) < cur);
+    return before.length ? before[before.length - 1] : null;
   }, [allMonths, month]);
 
   const prevAst = useMemo(() => {
@@ -653,47 +654,62 @@ export default function App() {
           아름 💜 진수네
         </h1>
         {!formOpen && (() => {
-          // Group months by year
-          const byYear = {};
-          allMonths.forEach((m) => {
-            const yr = m.match(/^(\d+)\./)?.[1] || "?";
-            if (!byYear[yr]) byYear[yr] = [];
-            byYear[yr].push(m);
-          });
-          const years = Object.keys(byYear).sort((a, b) => a - b);
-
+          // 연도 선택 + 1~12월 그리드
+          const now = new Date();
+          const curYear = now.getFullYear();
+          const curKey = curYear + "." + (now.getMonth() + 1) + "월";
+          const years = [...new Set([...allMonths.map((m) => parseInt(m)), curYear])].sort((a, b) => a - b);
+          const selYr = parseInt(month) || curYear;
+          const yi = years.indexOf(selYr);
+          const withData = new Set(allMonths);
+          function goYear(y) {
+            const inYear = allMonths.filter((m) => parseInt(m) === y && (data.some((e) => tl(e.date) === m) || assets.some((a) => a.month === m)));
+            const target = y === curYear ? curKey : (inYear.length ? inYear[inYear.length - 1] : y + ".1월");
+            setMonth(target); setEditingItem(null);
+          }
+          const arrow = (dir) => {
+            const ny = years[yi + dir];
+            return (
+              <button
+                onClick={() => ny && goYear(ny)}
+                disabled={!ny}
+                style={{ border: "none", background: "none", padding: "2px 8px", fontSize: 16, fontWeight: 700, cursor: ny ? "pointer" : "default", color: ny ? "#0f172a" : "#e2e8f0" }}
+              >{dir < 0 ? "‹" : "›"}</button>
+            );
+          };
           return (
-            <div style={{ display: "flex", gap: 4, marginTop: 10, overflowX: "auto", paddingBottom: 2, alignItems: "center" }}>
-              {years.map((yr, yi) => (
-                <div key={yr} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  {yi > 0 && (
-                    <div style={{ width: 1, height: 18, background: "#cbd5e1", flexShrink: 0, margin: "0 2px" }} />
-                  )}
-                  <span style={{
-                    flexShrink: 0, fontSize: 11, fontWeight: 800, color: "#94a3b8",
-                    padding: "4px 6px",
-                  }}>
-                    {yr}
-                  </span>
-                  {byYear[yr].map((m) => (
+            <>
+              <div style={{ position: "absolute", top: 14, right: 12, display: "flex", alignItems: "center" }}>
+                {arrow(-1)}
+                <span style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", minWidth: 52, textAlign: "center" }}>{selYr}년</span>
+                {arrow(1)}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 5, marginTop: 10 }}>
+                {Array.from({ length: 12 }, (_, i) => {
+                  const m = selYr + "." + (i + 1) + "월";
+                  const sel = month === m;
+                  const has = withData.has(m) && (data.some((e) => tl(e.date) === m) || assets.some((a) => a.month === m));
+                  return (
                     <button
                       key={m}
                       onClick={() => { setMonth(m); setEditingItem(null); }}
                       style={{
-                        flexShrink: 0, padding: "4px 11px", borderRadius: 14,
-                        border: "none", fontSize: 12,
-                        fontWeight: month === m ? 700 : 500,
-                        background: month === m ? "#0f172a" : "#f1f5f9",
-                        color: month === m ? "#fff" : "#64748b",
+                        position: "relative", padding: "6px 0", borderRadius: 8, border: "none", fontSize: 12,
+                        fontWeight: sel ? 800 : has ? 600 : 500,
+                        background: sel ? "#0f172a" : has ? "#f1f5f9" : "#f8fafc",
+                        color: sel ? "#fff" : has ? "#475569" : "#cbd5e1",
                         cursor: "pointer",
                       }}
                     >
-                      {m.replace(/^\d+\./, "")}
+                      {i + 1}월
+                      {m === curKey && (
+                        <span style={{ position: "absolute", top: 3, right: 5, width: 4, height: 4, borderRadius: 2, background: sel ? "#a78bfa" : "#7c3aed" }} />
+                      )}
                     </button>
-                  ))}
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           );
         })()}
       </div>
@@ -1068,7 +1084,7 @@ export default function App() {
             <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{month} 총 자산</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>{wonShort(totAst)}</div>
             <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              {prevAst && (() => {
+              {prevAst && totAst > 0 && (() => {
                 const b = pctBadge(totAst, prevAst.total);
                 return b ? (
                   <span style={{ fontSize: 11, fontWeight: 700, color: b.color, background: b.bg, padding: "2px 8px", borderRadius: 4 }}>
@@ -1076,7 +1092,7 @@ export default function App() {
                   </span>
                 ) : null;
               })()}
-              {janAst && month !== (month.match(/^(\d+)\./)?.[1] + ".1월") && (() => {
+              {janAst && totAst > 0 && month !== (month.match(/^(\d+)\./)?.[1] + ".1월") && (() => {
                 const b = pctBadge(totAst, janAst.total);
                 return b ? (
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#6366f1", background: "#eef2ff", padding: "2px 8px", borderRadius: 4 }}>
@@ -1090,14 +1106,14 @@ export default function App() {
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8" }}>부채</div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: "#e11d48", marginTop: 2 }}>-{wonShort(totDebt)}</div>
-                  {prevAst && prevAst.debt > 0 && totDebt < prevAst.debt && (
+                  {prevAst && prevAst.debt > 0 && totDebt > 0 && totDebt < prevAst.debt && (
                     <div style={{ fontSize: 10, fontWeight: 700, color: "#059669", marginTop: 1 }}>전월보다 {wonShort(prevAst.debt - totDebt)} 줄었어요</div>
                   )}
                 </div>
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8" }}>순자산</div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: netWorth >= 0 ? "#0f172a" : "#e11d48", marginTop: 2 }}>{wonShort(netWorth)}</div>
-                  {prevAst && prevAst.debt > 0 && (() => {
+                  {prevAst && prevAst.debt > 0 && totAst > 0 && (() => {
                     const d = netWorth - prevAst.net;
                     return d !== 0 ? (
                       <div style={{ fontSize: 10, fontWeight: 700, color: d > 0 ? "#059669" : "#dc2626", marginTop: 1 }}>전월 {d > 0 ? "+" : "-"}{wonShort(Math.abs(d))}</div>
