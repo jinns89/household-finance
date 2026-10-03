@@ -41,8 +41,26 @@ const INVEST_NAMES = [
 
 // ── Helpers ──
 function tl(dateStr) {
+  // "YYYY-MM-DD" 문자열은 시간대 영향 없이 그대로 해석
+  const p = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr || "");
+  if (p) return parseInt(p[1]) + "." + parseInt(p[2]) + "월";
   const d = new Date(dateStr);
   return d.getFullYear() + "." + (d.getMonth() + 1) + "월";
+}
+
+// 한국(로컬) 기준 오늘 날짜 "YYYY-MM-DD" (toISOString은 UTC라 오전 9시 전엔 하루 밀림)
+function localToday() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+// 선택된 월("2026.10월")에 맞는 기본 날짜: 이번 달이면 오늘, 아니면 그 달 1일
+function defaultDateFor(monthKey) {
+  const today = localToday();
+  if (!monthKey || tl(today) === monthKey) return today;
+  const p = /^(\d+)\.(\d+)/.exec(monthKey);
+  if (!p) return today;
+  return p[1] + "-" + String(parseInt(p[2])).padStart(2, "0") + "-01";
 }
 
 function dayStr(dateStr) {
@@ -111,6 +129,64 @@ const inputSt = {
   boxSizing: "border-box",
 };
 
+// ── Donut chart (SVG, 라이브러리 없음) ──
+function Donut({ items, total, centerLabel, centerColor = "#0f172a" }) {
+  const size = 132, stroke = 20, r = (size - stroke) / 2, C = 2 * Math.PI * r;
+  let offset = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
+      {total > 0 && items.map((it) => {
+        const len = (it.a / total) * C;
+        const gap = items.length > 1 ? Math.min(2, len / 3) : 0;
+        const el = (
+          <circle
+            key={it.c}
+            cx={size / 2} cy={size / 2} r={r} fill="none"
+            stroke={COLORS[it.c] || "#94a3b8"} strokeWidth={stroke}
+            strokeDasharray={`${Math.max(len - gap, 0)} ${C}`}
+            strokeDashoffset={-offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        );
+        offset += len;
+        return el;
+      })}
+      <text x="50%" y="45%" textAnchor="middle" style={{ fontSize: 10, fill: "#94a3b8", fontWeight: 600 }}>{centerLabel}</text>
+      <text x="50%" y="59%" textAnchor="middle" style={{ fontSize: 14, fill: centerColor, fontWeight: 800 }}>{wonShort(total)}</text>
+    </svg>
+  );
+}
+
+function DonutCard({ title, items, total, centerLabel, centerColor }) {
+  return (
+    <div style={card}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 10 }}>{title}</div>
+      {items.length === 0 ? (
+        <div style={{ color: "#cbd5e1", fontSize: 12, padding: "8px 0" }}>데이터 없음</div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <Donut items={items} total={total} centerLabel={centerLabel} centerColor={centerColor} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {items.map((it) => (
+              <div key={it.c} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: COLORS[it.c] || "#94a3b8", flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#475569", flex: 1, whiteSpace: "nowrap" }}>{SHORT[it.c] || it.c}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a", width: 40, textAlign: "right" }}>
+                  {total > 0 ? Math.round((it.a / total) * 100) : 0}%
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: "#94a3b8", width: 52, textAlign: "right", whiteSpace: "nowrap" }}>
+                  {wonShort(it.a)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════
 // APP
 // ═══════════════════════════════════════════
@@ -119,6 +195,7 @@ export default function App() {
   const [assets, setAssets] = useState([]);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState("home");
+  const [homePeriod, setHomePeriod] = useState("month"); // 홈 도넛 기간: month | year
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return now.getFullYear() + "." + (now.getMonth() + 1) + "월";
@@ -128,7 +205,7 @@ export default function App() {
   const [formOpen, setFormOpen] = useState(false);
   const [formType, setFormType] = useState("expense");
   const [editId, setEditId] = useState(null);
-  const [fDate, setFDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fDate, setFDate] = useState(() => localToday());
   const [fCat, setFCat] = useState("롯데(메인생활1)");
   const [fAmt, setFAmt] = useState("");
   const [fMemo, setFMemo] = useState("");
@@ -311,6 +388,29 @@ export default function App() {
     return INC_CATS.filter((c) => m[c]).map((c) => ({ c, a: m[c] })).sort((a, b) => b.a - a.a);
   }, [mInc]);
 
+  // ── 연간 집계 (선택된 월의 연도 기준) ──
+  const selYear = month.match(/^(\d+)\./)?.[1] || "";
+  const yearStats = useMemo(() => {
+    const yExp = data.filter((e) => e.type === "expense" && tl(e.date).startsWith(selYear + "."));
+    const yInc = data.filter((e) => e.type === "income" && tl(e.date).startsWith(selYear + "."));
+    const sumBy = (arr, cats) => {
+      const m = {};
+      arr.forEach((e) => { m[e.category] = (m[e.category] || 0) + e.amount; });
+      const known = cats.filter((c) => m[c]).map((c) => ({ c, a: m[c] }));
+      const etc = Object.keys(m).filter((c) => !cats.includes(c)).map((c) => ({ c, a: m[c] }));
+      return [...known, ...etc].sort((a, b) => b.a - a.a);
+    };
+    const months = new Set([...yExp, ...yInc].map((e) => parseInt(tl(e.date).match(/\.(\d+)/)[1])));
+    const ms = [...months].sort((a, b) => a - b);
+    return {
+      exp: yExp.reduce((s, e) => s + e.amount, 0),
+      inc: yInc.reduce((s, e) => s + e.amount, 0),
+      expByCat: sumBy(yExp, EXP_CATS),
+      incByCat: sumBy(yInc, INC_CATS),
+      range: ms.length ? (ms[0] === ms[ms.length - 1] ? ms[0] + "월" : ms[0] + "~" + ms[ms.length - 1] + "월") : "",
+    };
+  }, [data, selYear]);
+
   // ── Asset actions ──
   async function updateAssetAmount(assetName, monthKey, newAmount) {
     // Upsert to Supabase
@@ -366,7 +466,7 @@ export default function App() {
 
   // ── Form actions ──
   function resetForm() {
-    setFDate(new Date().toISOString().slice(0, 10));
+    setFDate(localToday());
     setFCat("롯데(메인생활1)");
     setFAmt("");
     setFMemo("");
@@ -377,6 +477,7 @@ export default function App() {
     resetForm();
     setFormType(type);
     setFCat(type === "income" ? "진수월급" : "롯데(메인생활1)");
+    setFDate(defaultDateFor(month)); // 선택된 월 기준으로 날짜 세팅
     setFormOpen(true);
   }
 
@@ -529,6 +630,11 @@ export default function App() {
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 5 }}>날짜</div>
               <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} style={inputSt} />
+              {fDate && (
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 5 }}>
+                  <b style={{ color: "#0f172a" }}>{tl(fDate).replace(/^(\d+)\./, "$1년 ")}</b> 내역으로 저장돼요
+                </div>
+              )}
             </div>
 
             <div>
@@ -622,11 +728,11 @@ export default function App() {
           {/* Expense / Income */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
             <div style={card}>
-              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>지출</div>
+              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{month.replace(/^\d+\./, "")} 지출</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>{wonShort(totExp)}</div>
             </div>
             <div style={card}>
-              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>수입</div>
+              <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{month.replace(/^\d+\./, "")} 수입</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: "#059669", marginTop: 2 }}>{wonShort(totInc)}</div>
             </div>
           </div>
@@ -647,46 +753,66 @@ export default function App() {
             </div>
           </div>
 
-          {/* Expense categories */}
-          <div style={card}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 10 }}>지출 카테고리</div>
-            {expByCat.length === 0 && (
-              <div style={{ color: "#cbd5e1", fontSize: 12, padding: "8px 0" }}>데이터 없음</div>
-            )}
-            {expByCat.map((item) => (
-              <div key={item.c} style={{ marginBottom: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{SHORT[item.c]}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{wonShort(item.a)}</span>
+          {/* Yearly summary */}
+          {(() => {
+            const yBal = yearStats.inc - yearStats.exp;
+            return (
+              <div style={{ ...card, background: "#0f172a" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>{selYear}년 누적</span>
+                  {yearStats.range && <span style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>{yearStats.range}</span>}
                 </div>
-                <div style={{ height: 6, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
-                  <div style={{
-                    width: (expByCat[0] ? (item.a / expByCat[0].a) * 100 : 0) + "%",
-                    height: "100%", background: COLORS[item.c] || "#94a3b8", borderRadius: 3,
-                  }} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  {[
+                    { l: "총 지출", v: wonShort(yearStats.exp), c: "#fda4af" },
+                    { l: "총 수입", v: wonShort(yearStats.inc), c: "#6ee7b7" },
+                    { l: "남은 돈", v: (yBal >= 0 ? "+" : "") + wonShort(yBal), c: yBal >= 0 ? "#fff" : "#fca5a5" },
+                  ].map((x) => (
+                    <div key={x.l}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8" }}>{x.l}</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: x.c, marginTop: 2, whiteSpace: "nowrap" }}>{x.v}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
+            );
+          })()}
+
+          {/* Donut period toggle */}
+          <div style={{ display: "flex", background: "#e2e8f0", borderRadius: 9, padding: 3, marginBottom: 12 }}>
+            {[
+              { id: "month", label: month.replace(/^\d+\./, "") + " 비중" },
+              { id: "year", label: selYear + "년 비중" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setHomePeriod(p.id)}
+                style={{
+                  flex: 1, padding: "7px 0", borderRadius: 7, border: "none", cursor: "pointer",
+                  fontSize: 12, fontWeight: 700,
+                  background: homePeriod === p.id ? "#fff" : "transparent",
+                  color: homePeriod === p.id ? "#0f172a" : "#64748b",
+                  boxShadow: homePeriod === p.id ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                }}
+              >
+                {p.label}
+              </button>
             ))}
           </div>
 
-          {/* Income breakdown */}
-          {incByCat.length > 0 && (
-            <div style={card}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 10 }}>수입 구성</div>
-              {incByCat.map((item) => (
-                <div key={item.c} style={{
-                  display: "flex", justifyContent: "space-between",
-                  padding: "5px 0", borderBottom: "1px solid #f1f5f9",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 4, background: COLORS[item.c] || "#94a3b8" }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>{SHORT[item.c]}</span>
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#059669" }}>{wonShort(item.a)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <DonutCard
+            title="지출 카테고리"
+            items={homePeriod === "year" ? yearStats.expByCat : expByCat}
+            total={homePeriod === "year" ? yearStats.exp : totExp}
+            centerLabel="지출"
+          />
+          <DonutCard
+            title="수입 구성"
+            items={homePeriod === "year" ? yearStats.incByCat : incByCat}
+            total={homePeriod === "year" ? yearStats.inc : totInc}
+            centerLabel="수입"
+            centerColor="#059669"
+          />
 
           {/* Assets */}
           {mAst.length > 0 && (
