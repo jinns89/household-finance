@@ -297,10 +297,7 @@ function MonthlyTrend({ data, type, month, onSelectMonth, baseColor }) {
           </linearGradient>
         </defs>
         {avg > 0 && (
-          <>
-            <line x1={padL} x2={W - padR} y1={avgY} y2={avgY} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />
-            <text x={W - padR} y={avgY - 4} textAnchor="end" fontSize="8.5" fontWeight="600" fill="#94a3b8">평균 {man(avg)}</text>
-          </>
+          <line x1={padL} x2={W - padR} y1={avgY} y2={avgY} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />
         )}
         <path d={area} fill={`url(#${gid})`} opacity="0.12" />
         <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
@@ -325,7 +322,7 @@ function MonthlyTrend({ data, type, month, onSelectMonth, baseColor }) {
 
       {avg > 0 && (
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f1f5f9", fontSize: 11, fontWeight: 600 }}>
-          <span style={{ color: "#64748b" }}>월평균 {wonShort(Math.round(avg))}</span>
+          <span style={{ color: "#64748b" }}><span style={{ color: "#cbd5e1", letterSpacing: "-1px" }}>┈┈</span> 월평균 {wonShort(Math.round(avg))}</span>
           {diff !== null && Math.abs(diff) >= 10000 && (
             <span style={{ color: (type === "expense") === (diff > 0) ? "#e11d48" : "#059669" }}>
               {month.replace(/^\d+\./, "")}은 평균보다 {wonShort(Math.round(Math.abs(diff)))} {diff > 0 ? "많아요" : "적어요"}
