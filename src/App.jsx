@@ -220,6 +220,123 @@ function AddItemRow({ color, placeholder, onAdd }) {
   );
 }
 
+// ── 월별 추이 꺾은선 그래프 (지출/수입 탭) ──
+function MonthlyTrend({ data, type, month, onSelectMonth, baseColor }) {
+  const [cat, setCat] = useState(null); // null = 전체
+  const year = parseInt(month) || new Date().getFullYear();
+  const now = new Date();
+  const rows = data.filter((e) => e.type === type && tl(e.date).startsWith(year + "."));
+
+  // 올해 기록된 카테고리 (금액 큰 순)
+  const catTotals = {};
+  rows.forEach((e) => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
+  const cats = Object.keys(catTotals).sort((a, b) => catTotals[b] - catTotals[a]);
+  const activeCat = cat && cats.includes(cat) ? cat : null;
+
+  // 표시할 마지막 달: 기록 있는 마지막 달 / 올해면 이번 달 / 선택한 달 중 가장 늦은 달
+  const selM = parseInt((month.match(/\.(\d+)/) || [])[1]) || 1;
+  const dataMonths = rows.map((e) => parseInt(tl(e.date).match(/\.(\d+)/)[1]));
+  const lastM = Math.min(12, Math.max(selM, year === now.getFullYear() ? now.getMonth() + 1 : 0, ...dataMonths, 1));
+
+  const series = Array.from({ length: lastM }, (_, i) => {
+    const m = year + "." + (i + 1) + "월";
+    const v = rows.filter((e) => tl(e.date) === m && (!activeCat || e.category === activeCat)).reduce((s, e) => s + e.amount, 0);
+    return { m, label: i + 1 + "월", v };
+  });
+
+  const color = activeCat ? (COLORS[activeCat] || baseColor) : baseColor;
+  // 평균: 1월 ~ 기록이 있는 마지막 달까지 (기록 없는 달은 0원으로 계산)
+  const lastDataM = dataMonths.length ? Math.max(...dataMonths) : 0;
+  const pool = series.slice(0, lastDataM);
+  const avg = pool.length ? pool.reduce((s, d) => s + d.v, 0) / pool.length : 0;
+  const cur = series.find((d) => d.m === month);
+  const diff = cur && cur.v > 0 && pool.length > 1 ? cur.v - avg : null;
+
+  const W = 440, H = 150, padL = 18, padR = 18, padTop = 26, padBot = 20;
+  const bodyH = H - padTop - padBot, usableW = W - padL - padR;
+  const maxV = Math.max(...series.map((d) => d.v), 1);
+  const pts = series.map((d, i) => ({
+    ...d,
+    x: padL + (series.length === 1 ? usableW / 2 : (i / (series.length - 1)) * usableW),
+    y: padTop + bodyH - (d.v / maxV) * bodyH,
+  }));
+  const line = pts.map((p, i) => (i ? "L" : "M") + " " + p.x + " " + p.y).join(" ");
+  const area = line + " L " + pts[pts.length - 1].x + " " + (padTop + bodyH) + " L " + pts[0].x + " " + (padTop + bodyH) + " Z";
+  const avgY = padTop + bodyH - (avg / maxV) * bodyH;
+  const man = (v) => (v >= 100000000 ? (v / 100000000).toFixed(1) + "억" : Math.round(v / 10000).toLocaleString());
+  const gid = "trendGrad-" + type;
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div style={card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>{year}년 월별 추이</span>
+        <span style={{ fontSize: 10, color: "#94a3b8" }}>단위: 만원</span>
+      </div>
+
+      {/* 카테고리 선택 */}
+      <div style={{ display: "flex", gap: 5, overflowX: "auto", paddingBottom: 6, marginBottom: 4, scrollbarWidth: "none" }}>
+        {[null, ...cats].map((c) => {
+          const on = activeCat === c;
+          const cc = c ? (COLORS[c] || "#94a3b8") : "#0f172a";
+          return (
+            <button key={c || "all"} onClick={() => setCat(c)} style={{
+              flexShrink: 0, padding: "4px 10px", borderRadius: 14, cursor: "pointer", fontSize: 11, fontWeight: 700,
+              border: "1.5px solid " + (on ? cc : "#e2e8f0"), background: on ? cc : "#fff", color: on ? "#fff" : "#64748b",
+            }}>{c ? (SHORT[c] || c) : "전체"}</button>
+          );
+        })}
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {avg > 0 && (
+          <>
+            <line x1={padL} x2={W - padR} y1={avgY} y2={avgY} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />
+            <text x={W - padR} y={avgY - 4} textAnchor="end" fontSize="8.5" fontWeight="600" fill="#94a3b8">평균 {man(avg)}</text>
+          </>
+        )}
+        <path d={area} fill={`url(#${gid})`} opacity="0.12" />
+        <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {pts.map((p) => {
+          const isCur = p.m === month;
+          return (
+            <g key={p.m} onClick={() => onSelectMonth(p.m)} style={{ cursor: "pointer" }}>
+              <rect x={p.x - 16} y={0} width={32} height={H} fill="transparent" />
+              <circle cx={p.x} cy={p.y} r={isCur ? 5 : 3.2} fill={isCur ? color : "#fff"} stroke={color} strokeWidth={isCur ? 2.5 : 1.8} />
+              {p.v > 0 && (
+                <text x={p.x} y={p.y - 9} textAnchor="middle" fontSize={isCur ? 10 : 8.5} fontWeight={isCur ? 800 : 600} fill={isCur ? color : "#64748b"}>
+                  {man(p.v)}
+                </text>
+              )}
+              <text x={p.x} y={H - 4} textAnchor="middle" fontSize="9.5" fontWeight={isCur ? 800 : 500} fill={isCur ? "#0f172a" : "#94a3b8"}>
+                {p.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {avg > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #f1f5f9", fontSize: 11, fontWeight: 600 }}>
+          <span style={{ color: "#64748b" }}>월평균 {wonShort(Math.round(avg))}</span>
+          {diff !== null && Math.abs(diff) >= 10000 && (
+            <span style={{ color: (type === "expense") === (diff > 0) ? "#e11d48" : "#059669" }}>
+              {month.replace(/^\d+\./, "")}은 평균보다 {wonShort(Math.round(Math.abs(diff)))} {diff > 0 ? "많아요" : "적어요"}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════
 // APP
 // ═══════════════════════════════════════════
@@ -963,6 +1080,7 @@ export default function App() {
               ))}
             </div>
           </div>
+          <MonthlyTrend data={data} type="expense" month={month} baseColor="#e11d48" onSelectMonth={(m) => { setMonth(m); setEditingItem(null); }} />
           {mExp.length === 0 && (
             <div style={{ textAlign: "center", padding: "32px 0", color: "#94a3b8", fontSize: 13 }}>
               이 달의 지출 없음
@@ -1008,6 +1126,7 @@ export default function App() {
             <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{month} 총 수입</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: "#059669", marginTop: 2 }}>+{won(totInc)}</div>
           </div>
+          <MonthlyTrend data={data} type="income" month={month} baseColor="#059669" onSelectMonth={(m) => { setMonth(m); setEditingItem(null); }} />
           {mInc.length === 0 && (
             <div style={{ textAlign: "center", padding: "32px 0", color: "#94a3b8", fontSize: 13 }}>
               이 달의 수입 없음
